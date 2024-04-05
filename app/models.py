@@ -7,25 +7,25 @@ from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
 
 class Customer(Base):
-    __tablename__ = "customers"
+    __tablename__ = "customer"
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     email: Mapped[str]
     password: Mapped[str]
     data_create: Mapped[datetime]
     data_change: Mapped[datetime]
-    role: Mapped[str]
+    role: Mapped[str] = mapped_column(default='user')
     orders: Mapped[List["Order"]] = relationship(back_populates='customer', cascade='save-update, merge, delete')
         
 class Order(Base):
-    __tablename__ = "orders"
+    __tablename__ = "order"
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     data_create: Mapped[datetime]
     status: Mapped[str]
-    customer_id: Mapped[str] = mapped_column(ForeignKey('customers.id'))
+    customer_id: Mapped[str] = mapped_column(ForeignKey('customer.id'))
     line_items: Mapped[List["OrderItem"]] = relationship(back_populates='order', cascade='save-update, merge, delete')
 
 class Item(Base):
-    __tablename__ = "items"
+    __tablename__ = "item"
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     name: Mapped[str]
     description: Mapped[str]
@@ -37,10 +37,10 @@ class Item(Base):
     quantity: Mapped[int]
 
 class OrderItem(Base):
-    __tablename__ = 'order_items'
+    __tablename__ = 'order_item'
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    order_id: Mapped[str] = mapped_column(ForeignKey('orders.id'))
-    item_id: Mapped[str] = mapped_column(ForeignKey('items.id'))
+    order_id: Mapped[str] = mapped_column(ForeignKey('order.id'))
+    item_id: Mapped[str] = mapped_column(ForeignKey('item.id'))
     quantity: Mapped[int]
     item: Mapped[str] = relationship('Item')
 
