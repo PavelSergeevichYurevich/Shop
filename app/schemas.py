@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-class UserCreateSchema(BaseModel):
+class CustomerCreateSchema(BaseModel):
     pass
     
 class UserCheckSchema(BaseModel):

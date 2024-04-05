@@ -1,4 +1,4 @@
-from database import Base
+from database.database import Base
 from datetime import datetime
 from typing import List
 from sqlalchemy import ForeignKey

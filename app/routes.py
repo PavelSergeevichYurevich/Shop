@@ -1,10 +1,14 @@
-from fastapi import APIRouter
-from fastapi import Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
-from fastapi import status
-from sqlalchemy.orm import Session
-from sqlalchemy import select
-from models import Customer, Order, Item, OrderItem
-from database import engine
-from schemas import UserCreateSchema, TaskCreateSchema, TaskUpdateSchema, TaskDeleteSchema, UserCheckSchema
+
+shop_router = APIRouter()
+templates = Jinja2Templates(directory="templates")
+
+@shop_router.get("/login/")
+async def login(request:Request):
+    return templates.TemplateResponse(request=request, name="login.html")
+
+@shop_router.get("/register/")
+async def login(request:Request):
+    return templates.TemplateResponse(request=request, name="register.html")
+
