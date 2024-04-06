@@ -1,6 +1,6 @@
 # роутер операция с покупателями
 from fastapi import APIRouter, Depends, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from dependencies.dependency import get_db
@@ -12,6 +12,19 @@ customer_router = APIRouter(
     tags=['Customers']
 )
 templates = Jinja2Templates(directory="templates")
+
+# вывести пользрвателей
+@customer_router.get("/users/", response_class = HTMLResponse)
+async def get_users_page(request:Request, db: Session = Depends(get_db)):
+        stmnt = db.select(Customer)
+        users:list = db.session.scalars(stmnt).all()
+        context:dict = {}
+        i:int = 1
+        for user in users:
+            new_el = {str(i): user.name}
+            context.update(new_el)
+            i += 1
+        return templates.TemplateResponse("users.html", {"request": request, "context": context})
 
 # создать пользователя
 @customer_router.post("/rec/")

@@ -15,16 +15,26 @@
         margin-top: 100px;
         text-align: center;
     }
-    #checkForm {
+    #regForm {
+        width: 80%;
+        margin: auto;
+    }
+    #logForm {
         width: 80%;
         margin: auto;
     }
 
-    #checkForm input {
+    #regForm input {
         width: 100%;
         margin-bottom: 10px;
         box-sizing: border-box;
     }
+    #logForm input {
+        width: 100%;
+        margin-bottom: 10px;
+        box-sizing: border-box;
+    }
+
     #response {
         color: red;
     }

@@ -1,66 +1,29 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="{{ url_for('static', path='/css/styles.css') }}" rel="stylesheet">
-    <title>Register</title>
-</head>
-<body>
+{% extends "index.html" %}
+
+{% block content%}  
     <div class="main">
-        <h2>Registration</h2>
-        <form method="POST" id="checkForm" onsubmit="send()">
+    <h2>Registration</h2>
+    <form method="POST" id="regForm" onsubmit="reg()">
 
-            <p class="textField" id="emailText"><span>Email:</span></p>
-            <input type="email" id="email" name="email" required>
+        <p class="textField" id="emailText"><span>Email:</span></p>
+        <input type="email" id="email" name="email" required>
 
-            <p class="textField" id="passwordText">Password:</p>
-            <input type="password" id="password" name="password" required>
+        <p class="textField" id="passwordText">Password:</p>
+        <input type="password" id="password" name="password" required>
 
-            <p class="textField" id="nameText">Name:</p>
-            <input type="text" id="name" name="name" required>
+        <p class="textField" id="nameText">Name:</p>
+        <input type="text" id="name" name="name" required>
 
-            <input type="submit" value="Register">
-        </form>
-        <button onclick="window.location.href='/'">На главную</button>
-        <button onclick="window.location.href='/users/'">Посмотреть пользователей</button>
-        <button onclick="window.location.href='/login/'">Вход</button>
+        <input type="submit" value="Register">
+    </form>
+    
+    <button onclick="window.location.href='/'">На главную</button>
+    <button onclick="window.location.href='/users/'">Посмотреть пользователей</button>
+    <button onclick="window.location.href='/login/'">Вход</button>
 
     </div>
-
-    <script defer>
-        const form = document.querySelector('#checkForm')
-        form.addEventListener('submit', function(e) {e.preventDefault()})
-
-        async function send(){
-            let email = document.querySelector("#email").value;
-            let password = document.querySelector("#password").value;
-            let name = document.querySelector("#name").value;
-            let expDate = new Date;
-            expDate.setTime((new Date).getTime() + 604800000);
-            document.cookie = email+"="+name+";expires="+expDate.toGMTString()+";path=/";
-
-            fetch("/auth/rec/", {
-                method: "POST",
-                headers: { "Accept": "application/json", "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                    email: email,
-                    password: password,
-                    name: name
-                })
-            })
-            .then(res => {
-                if (res.redirected) {
-                    alert('Пользователь зарегистрирован')
-                    window.location.href = res.url;
-                    return;
-                } 
-                else
-                    return res.text();
-                });
-            
-        }
-
-    </script>
-</body>
-</html>
+{% endblock%}
+{% block script %}
+    <script src="{{ url_for('static', path='/js/scriptReg.js') }}"></script>
+    {{ super() }}
+{% endblock %}
