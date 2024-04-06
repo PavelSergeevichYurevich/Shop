@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="{{ url_for('static', path='/css/styles.css') }}" rel="stylesheet">
+    <title>Document</title>
+</head>
+<style>
+   
+</style>
+<body>
+    <h1 style="text-align: center;">Users</h1>
+    <h2 style="text-align: center";>Список пользователей</h2>
+  
+    <table>
+        <thead><tr><th>№</th><th>Name</th></tr></thead>
+        <tbody>
+            {%for k,v in context.items()%}
+                <tr>
+                    <th>{{k}}</th>
+                    <th>{{v}}</th>
+                </tr>
+            {%endfor%}
+        </tbody>
+    </table>
+
+
+    <div class="div">
+        <button onclick="window.location.href='/'">На главную</button>
+        <button onclick="window.location.href='/login/'">Вход</button>
+        <button onclick="window.location.href='/register/'">Регистрация</button>
+    </div>
+
+
+</body>
+</html>

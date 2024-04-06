@@ -5,3 +5,8 @@ class CustomerCreateSchema(BaseModel):
     password: str
     name: str
     
+class CustomerUpdateSchema(BaseModel):
+    id: int
+    field: str
+    new_value: str
+    name: str
