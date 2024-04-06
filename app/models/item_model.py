@@ -9,9 +9,9 @@ class Item(Base):
     name: Mapped[str]
     description: Mapped[str]
     image: Mapped[int]
-    data_create: Mapped[datetime]
-    data_change: Mapped[datetime]
+    data_create: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    data_change: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     category: Mapped[str]
-    price: Mapped[int]
+    price: Mapped[float]
     quantity: Mapped[int]
     

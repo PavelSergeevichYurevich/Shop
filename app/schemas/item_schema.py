@@ -1,15 +1,13 @@
 from pydantic import BaseModel
 
 class ItemCreateSchema(BaseModel):
-    email: str
-    password: str
     name: str
+    description: str
+    image: int
+    category: str
+    price: float
+    quantity: int
     
-class ItemUpdateSchema(BaseModel):
-    id: int
-    field: str
-    new_value: str
-    name: str
+class ItemUpdateSchema(ItemCreateSchema):
+    pass
     
-class ItemDeleteSchema(BaseModel):
-    id: int

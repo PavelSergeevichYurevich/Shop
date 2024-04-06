@@ -1,5 +1,6 @@
 # роутер операция с покупателями
 from datetime import datetime
+from typing import List
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -16,20 +17,21 @@ customer_router = APIRouter(
 templates = Jinja2Templates(directory="templates")
 
 # вывести пользoвателей
-@customer_router.get("/customers/", response_class = HTMLResponse)
+@customer_router.get("/show/", response_model=List[CustomerCreateSchema])
 async def get_customers(request:Request, db: Session = Depends(get_db)):
     stmnt = select(Customer)
     users:list = db.scalars(stmnt).all()
-    context:dict = {}
+    """ context:dict = {}
     i:int = 1
     for user in users:
         new_el = {str(i): user.name}
         context.update(new_el)
         i += 1
-    return templates.TemplateResponse("users.html", {"request": request, "context": context})
+    return templates.TemplateResponse("users.html", {"request": request, "context": context}) """
+    return users
 
 # создать пользователя
-@customer_router.post("/rec/")
+@customer_router.post("/add/", response_model=CustomerCreateSchema)
 async def add_customer(request:Request, customer: CustomerCreateSchema, db: Session = Depends(get_db)):
     new_customer = Customer(
         email = customer.email,
@@ -39,7 +41,8 @@ async def add_customer(request:Request, customer: CustomerCreateSchema, db: Sess
     db.add(new_customer)
     db.commit()
     db.refresh(new_customer)
-    return RedirectResponse(url="/app/login/", status_code=status.HTTP_302_FOUND)
+    return new_customer
+    # return RedirectResponse(url="/app/login/", status_code=status.HTTP_302_FOUND)
 
 # изменить пользователя
 @customer_router.put(path='/update/')
