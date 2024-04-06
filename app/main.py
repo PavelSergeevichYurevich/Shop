@@ -7,11 +7,12 @@ from models.customer_model import Customer
 from models.order_model import Order
 from models.item_model import Item
 from models.orderitem_model import OrderItem
-from routes import auth, customer
+from routes import auth, customer, item
 
 app = FastAPI(title='My Shop')
 app.include_router(auth.app_router)
 app.include_router(customer.customer_router)
+app.include_router(item.item_router)
 app.mount("/static", StaticFiles(directory=Path(__file__).parent.absolute() / "static"), name="static")
 
 HOST = '127.0.0.1'

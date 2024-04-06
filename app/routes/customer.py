@@ -3,11 +3,11 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 from dependencies.dependency import get_db
 from models.customer_model import Customer
-from schemas.customer import CustomerCreateSchema, CustomerDeleteSchema, CustomerUpdateSchema
+from schemas.customer_schema import CustomerCreateSchema, CustomerUpdateSchema
 
 customer_router = APIRouter(
     prefix='/customer',
@@ -15,9 +15,9 @@ customer_router = APIRouter(
 )
 templates = Jinja2Templates(directory="templates")
 
-# вывести пользрвателей
-@customer_router.get("/users/", response_class = HTMLResponse)
-async def get_users_page(request:Request, db: Session = Depends(get_db)):
+# вывести пользoвателей
+@customer_router.get("/customers/", response_class = HTMLResponse)
+async def get_customers(request:Request, db: Session = Depends(get_db)):
     stmnt = select(Customer)
     users:list = db.scalars(stmnt).all()
     context:dict = {}
@@ -42,27 +42,23 @@ async def add_customer(request:Request, customer: CustomerCreateSchema, db: Sess
     return RedirectResponse(url="/app/login/", status_code=status.HTTP_302_FOUND)
 
 # изменить пользователя
-@customer_router.post("/userchange/")
-async def change_task(request:Request, customer_upd: CustomerUpdateSchema, db: Session = Depends(get_db)):
-    name = customer_upd.name
-    stmnt = select(Customer).where(Customer.id == customer_upd.id)
-    customer = db.scalars(stmnt).one()
-    match customer_upd.field:
-        case 'email': customer.email = customer_upd.new_value
-        case 'password': customer.password = customer_upd.new_value
-        case 'name': customer.name = customer_upd.new_value
-        case 'role': customer.role = customer_upd.new_value
-    customer.data_change = datetime.utcnow()
-    db.add(customer)
+@customer_router.put(path='/update/')
+async def change_customer(request:Request, customer_id:int, customer_upd: CustomerUpdateSchema, db: Session = Depends(get_db)):
+    stmnt = update(Customer).where(Customer.id == customer_id).values(
+        email = customer_upd.email,
+        password = customer_upd.password,
+        name = customer_upd.name,
+        role = customer_upd.role,
+        data_change = datetime.utcnow()
+    )
+    customer = db.execute(stmnt)
     db.commit()
-    db.refresh(customer)
-    return RedirectResponse(url="/customer/users", status_code=status.HTTP_302_FOUND)
+    return customer
 
 # удалить пользователя
-@customer_router.post("/userdel/")
-async def del_task(request:Request, customer_del: CustomerDeleteSchema, db: Session = Depends(get_db)):
-    stmnt = select(Customer).where(Customer.id == customer_del.id)
-    customer = db.scalars(stmnt).one()
-    db.delete(customer)
+@customer_router.delete(path='/delete/')
+async def del_customer(request:Request, id:int, db: Session = Depends(get_db)):
+    stmnt = delete(Customer).where(Customer.id == id)
+    customer = db.execute(stmnt)
     db.commit()
-    return RedirectResponse(url="/customer/users", status_code=status.HTTP_302_FOUND)
+    return customer

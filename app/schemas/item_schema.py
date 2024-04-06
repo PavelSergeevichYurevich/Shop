@@ -1,15 +1,15 @@
 from pydantic import BaseModel
 
-class CustomerCreateSchema(BaseModel):
+class ItemCreateSchema(BaseModel):
     email: str
     password: str
     name: str
     
-class CustomerUpdateSchema(BaseModel):
+class ItemUpdateSchema(BaseModel):
     id: int
     field: str
     new_value: str
     name: str
     
-class CustomerDeleteSchema(BaseModel):
+class ItemDeleteSchema(BaseModel):
     id: int
