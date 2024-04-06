@@ -10,3 +10,6 @@ class CustomerUpdateSchema(BaseModel):
     field: str
     new_value: str
     name: str
+    
+class CustomerDeleteSchema(BaseModel):
+    id: int

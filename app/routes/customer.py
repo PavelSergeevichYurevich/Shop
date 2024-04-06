@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from dependencies.dependency import get_db
 from models.customer_model import Customer
-from schemas.customer import CustomerCreateSchema, CustomerUpdateSchema
+from schemas.customer import CustomerCreateSchema, CustomerDeleteSchema, CustomerUpdateSchema
 
 customer_router = APIRouter(
     prefix='/customer',
@@ -56,4 +56,13 @@ async def change_task(request:Request, customer_upd: CustomerUpdateSchema, db: S
     db.add(customer)
     db.commit()
     db.refresh(customer)
+    return RedirectResponse(url="/customer/users", status_code=status.HTTP_302_FOUND)
+
+# удалить пользователя
+@customer_router.post("/userdel/")
+async def del_task(request:Request, customer_del: CustomerDeleteSchema, db: Session = Depends(get_db)):
+    stmnt = select(Customer).where(Customer.id == customer_del.id)
+    customer = db.scalars(stmnt).one()
+    db.delete(customer)
+    db.commit()
     return RedirectResponse(url="/customer/users", status_code=status.HTTP_302_FOUND)
