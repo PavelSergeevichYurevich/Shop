@@ -35,7 +35,7 @@ async def add_order(request:Request, customer_id: int, status:str, order: OrderC
     new_order = Order(
         customer_id = customer_id,
         status = status,
-        line_items = list(order)
+        item = [x.__dict__ for x in order]
     )
     db.add(new_order)
     db.commit()

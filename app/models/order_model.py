@@ -1,3 +1,5 @@
+# from models.customer_model import Customer
+from models.orderitem_model import OrderItem
 from database.database import Base
 from datetime import datetime
 from typing import List
@@ -13,5 +15,5 @@ class Order(Base):
     date_change: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     status: Mapped[str]
     customer_id: Mapped[str] = mapped_column(ForeignKey('customers.id'))
-    line_items: Mapped[List["OrderItem"]] = relationship(back_populates='order', cascade='save-update, merge, delete')
+    item: Mapped[List["OrderItem"]] = relationship(back_populates='order', cascade='save-update, merge, delete')
     customer: Mapped["Customer"] = relationship(back_populates='orders')

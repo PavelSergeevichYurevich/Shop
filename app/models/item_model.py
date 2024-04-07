@@ -1,7 +1,11 @@
+from typing import List
+from models.orderitem_model import OrderItem
 from database.database import Base
 from datetime import datetime
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
+from sqlalchemy.orm import relationship
+
 
 class Item(Base):
     __tablename__ = "items"
@@ -14,4 +18,5 @@ class Item(Base):
     category: Mapped[str]
     price: Mapped[float]
     quantity: Mapped[int]
+    orders: Mapped[List['OrderItem']] = relationship(back_populates='item')
     
