@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
+from models.orderitem_model import OrderItem
 from dependencies.dependency import get_db
 from models.order_model import Order
 from schemas.order_schema import OrderCreateSchema
@@ -31,12 +32,8 @@ async def get_items(request:Request, db: Session = Depends(get_db)):
 
 # создать заказ
 @order_router.post("/add/")
-async def add_order(request:Request, customer_id: int, status:str, order: OrderCreateSchema, db: Session = Depends(get_db)):
-    new_order = Order(
-        customer_id = customer_id,
-        status = status,
-        item = [x.__dict__ for x in order]
-    )
+async def add_order(request:Request,  customer_id: int, status: str, order: OrderCreateSchema, db: Session = Depends(get_db)):
+    new_order = Order(**order.dict(), customer_id = customer_id, status = status)
     db.add(new_order)
     db.commit()
     db.refresh(new_order)
