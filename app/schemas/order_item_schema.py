@@ -1,5 +1,5 @@
+from typing import Dict
 from pydantic import BaseModel
 
 class OrderItem(BaseModel):
-    item_id: int
-    quantity: int
+    order: Dict[int, int]
