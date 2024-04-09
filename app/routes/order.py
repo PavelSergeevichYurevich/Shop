@@ -33,7 +33,11 @@ async def get_items(request:Request, db: Session = Depends(get_db)):
 # создать заказ
 @order_router.post("/add/")
 async def add_order(request:Request,  customer_id: int, status: str, order: OrderCreateSchema, db: Session = Depends(get_db)):
-    new_order = Order(**order.dict(), customer_id = customer_id, status = status)
+    new_order = Order(
+        customer_id = customer_id, 
+        status = status,
+        item = [dict(x) for x in order]
+        )
     db.add(new_order)
     db.commit()
     db.refresh(new_order)
