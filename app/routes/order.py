@@ -32,15 +32,18 @@ async def get_items(request:Request, db: Session = Depends(get_db)):
 
 # создать заказ
 @order_router.post("/add/")
-async def add_order(request:Request,  customer_id: int, status: str, order: OrderCreateSchema, db: Session = Depends(get_db)):
-    new_order = Order(
-        customer_id = customer_id, 
-        status = status,
-        item = [x for x in order],
+async def add_order(request:Request, order: OrderCreateSchema, db: Session = Depends(get_db)):
+    print(order.item[0])
+    
+    
+    """ new_order = Order(
+        customer_id = order.customer_id, 
+        status = order.status,
+        item = order.item
         )
     db.add(new_order)
     db.commit()
     db.refresh(new_order)
     # return RedirectResponse(url="/app/login/", status_code=status.HTTP_302_FOUND)
-    return new_order
+    return new_order """
 

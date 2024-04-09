@@ -1,5 +1,5 @@
-from typing import Dict
+from typing import Dict, List
 from pydantic import BaseModel
 
 class OrderItem(BaseModel):
-    order: Dict[int, int]
+    pass
