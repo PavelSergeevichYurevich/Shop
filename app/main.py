@@ -3,10 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import uvicorn
 from database.database import engine, Base
-from models.customer_model import Customer
-from models.order_model import Order
-from models.item_model import Item
-from models.orderitem_model import OrderItem
+from models.models import Customer, Order, Item, OrderItem
 from routes import auth, customer, item, order
 
 app = FastAPI(title='My Shop')

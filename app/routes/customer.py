@@ -7,8 +7,8 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 from dependencies.dependency import get_db
-from models.customer_model import Customer
-from schemas.customer_schema import CustomerCreateSchema, CustomerUpdateSchema
+from models.models import Customer
+from schemas.schemas import CustomerCreateSchema, CustomerUpdateSchema
 
 customer_router = APIRouter(
     prefix='/customer',

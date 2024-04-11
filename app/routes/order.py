@@ -6,11 +6,10 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
-from models.orderitem_model import OrderItem
+from models.models import OrderItem
 from dependencies.dependency import get_db
-from models.order_model import Order
-from schemas.order_schema import OrderCreateSchema
-from schemas.order_item_schema import OrderItemSchema
+from models.models import Order
+from schemas.schemas import OrderCreateSchema, OrderItemSchema
 
 
 order_router = APIRouter(

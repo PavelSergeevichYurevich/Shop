@@ -7,8 +7,8 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 from dependencies.dependency import get_db
-from models.item_model import Item
-from schemas.item_schema import ItemCreateSchema, ItemUpdateSchema
+from models.models import Item
+from schemas.schemas import ItemCreateSchema, ItemUpdateSchema
 
 item_router = APIRouter(
     prefix='/item',
