@@ -23,6 +23,8 @@ templates = Jinja2Templates(directory="templates")
 async def get_items(request:Request, customer_id:int, db: Session = Depends(get_db)):
     stmnt = select(Order).where(Order.customer_id == customer_id)
     orders:list = db.scalars(stmnt).all()
+    for order in orders:
+        print(order.item)
     return orders
 
 # создать заказ
