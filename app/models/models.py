@@ -13,7 +13,7 @@ class Customer(Base):
     data_create: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     data_change: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     role: Mapped[str] = mapped_column(default='user')
-    orders: Mapped[List["Order"]] = relationship(back_populates='customer', cascade='save-update, merge, delete', passive_deletes=True)
+    order: Mapped[List["Order"]] = relationship(back_populates='customer', cascade='save-update, merge, delete', passive_deletes=True)
 
 class Order(Base):
     __tablename__ = "order"
@@ -21,9 +21,9 @@ class Order(Base):
     date_create: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     date_change: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     status: Mapped[str]
-    customer_id: Mapped[str] = mapped_column(ForeignKey('customer.id', ondelete='CASCADE'))
-    item: Mapped[List["OrderItem"]] = relationship(back_populates='order')
-    customer: Mapped["Customer"] = relationship(back_populates='orders')
+    customer_id: Mapped[int] = mapped_column(ForeignKey('customer.id', ondelete='CASCADE'), index=True)
+    item: Mapped[List["OrderItem"]] = relationship(back_populates='order', cascade='save-update, merge, delete', passive_deletes=True)
+    customer: Mapped["Customer"] = relationship(back_populates='order')
 
 class Item(Base):
     __tablename__ = "item"
@@ -40,7 +40,7 @@ class Item(Base):
 
 class OrderItem(Base):
     __tablename__ = 'order_item'
-    order_id: Mapped[int] = mapped_column(ForeignKey('order.id'), primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey('order.id', ondelete='CASCADE'), index=True, primary_key=True)
     item_id: Mapped[int] = mapped_column(ForeignKey('item.id'), primary_key=True)
     quantity: Mapped[int]
     item: Mapped[str] = relationship('Item', back_populates='orders')

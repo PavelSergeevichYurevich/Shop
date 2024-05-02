@@ -48,3 +48,11 @@ async def add_order(request:Request, order: OrderCreateSchema, order_item: Order
     # return RedirectResponse(url="/app/login/", status_code=status.HTTP_302_FOUND)
     return new_order
 
+# удалить заказ
+@order_router.delete(path='/delete/')
+async def del_order(request:Request, id:int, db: Session = Depends(get_db)):
+    stmnt = delete(Order).where(Order.id == id)
+    order = db.execute(stmnt)
+    db.commit()
+    return order
+
