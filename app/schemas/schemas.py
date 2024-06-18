@@ -26,3 +26,7 @@ class ItemUpdateSchema(ItemCreateSchema):
 class OrderItemSchema(BaseModel):
     item_id: int
     quantity: int
+    
+class DeletingItemSchema(BaseModel):
+    order_id: int
+    item_id: int

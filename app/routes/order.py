@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from models.models import OrderItem
 from dependencies.dependency import get_db
 from models.models import Order
-from schemas.schemas import OrderCreateSchema, OrderItemSchema
+from schemas.schemas import DeletingItemSchema, OrderCreateSchema, OrderItemSchema
 
 
 order_router = APIRouter(
@@ -55,4 +55,12 @@ async def del_order(request:Request, id:int, db: Session = Depends(get_db)):
     order = db.execute(stmnt)
     db.commit()
     return order
+
+#удалить строку в заказе
+@order_router.delete(path='/deleteitem/')
+async def del_item(request:Request, deleting_item: DeletingItemSchema,db: Session = Depends(get_db)):
+    stmnt = delete(OrderItem).where((OrderItem.order_id == deleting_item.order_id ) & (OrderItem.item_id == deleting_item.item_id))
+    deleted_item = db.execute(stmnt)
+    db.commit()
+    return deleted_item
 
