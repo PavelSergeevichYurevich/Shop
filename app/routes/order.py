@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from models.models import OrderItem
 from dependencies.dependency import get_db
 from models.models import Order
-from schemas.schemas import DeletingItemSchema, OrderCreateSchema, OrderItemSchema
+from schemas.schemas import AddingItemSchema, DeletingItemSchema, OrderCreateSchema, OrderItemSchema, UpdatingItemSchema
 
 
 order_router = APIRouter(
@@ -56,6 +56,16 @@ async def del_order(request:Request, id:int, db: Session = Depends(get_db)):
     db.commit()
     return order
 
+#изменить заказ
+@order_router.put(path='/update/')
+async def update_order(request:Request, updating_item: UpdatingItemSchema, db: Session = Depends(get_db)):
+    stmnt = update(OrderItem).where((OrderItem.order_id == updating_item.order_id) & (OrderItem.item_id == updating_item.item_id)).values(
+        quantity = updating_item.new_quantity
+    )
+    updated_item = db.execute(stmnt)
+    db.commit()
+    return updated_item
+
 #удалить строку в заказе
 @order_router.delete(path='/deleteitem/')
 async def del_item(request:Request, deleting_item: DeletingItemSchema,db: Session = Depends(get_db)):
@@ -64,3 +74,19 @@ async def del_item(request:Request, deleting_item: DeletingItemSchema,db: Sessio
     db.commit()
     return deleted_item
 
+#добавить строку в заказ
+@order_router.post(path='/additem/')
+async def add_item(request:Request, adding_item: AddingItemSchema,db: Session = Depends(get_db)):
+    new_order_item = OrderItem(
+        order_id = adding_item.order_id,
+        item_id = adding_item.item_id,
+        quantity = adding_item.quantity
+    )
+    db.add(new_order_item)
+    db.commit()
+    db.refresh(new_order_item)
+    return new_order_item
+
+
+
+    

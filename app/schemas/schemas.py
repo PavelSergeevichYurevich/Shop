@@ -27,6 +27,12 @@ class OrderItemSchema(BaseModel):
     item_id: int
     quantity: int
     
+class AddingItemSchema(OrderItemSchema):
+    order_id: int
+    
 class DeletingItemSchema(BaseModel):
     order_id: int
     item_id: int
+    
+class UpdatingItemSchema(DeletingItemSchema):
+    new_quantity: int
