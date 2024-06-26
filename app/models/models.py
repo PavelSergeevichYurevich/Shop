@@ -30,7 +30,7 @@ class Item(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     name: Mapped[str]
     description: Mapped[str]
-    image: Mapped[int]
+    image: Mapped[str]
     data_create: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     data_change: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     category: Mapped[str]

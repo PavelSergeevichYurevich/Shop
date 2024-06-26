@@ -1,7 +1,9 @@
 # роутер операция с товарами
 from datetime import datetime
+import os
+import shutil
 from typing import List
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, File, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import delete, select, update
@@ -31,12 +33,20 @@ async def get_items(request:Request, db: Session = Depends(get_db)):
     return items
 
 # создать товары
-@item_router.post("/add/", response_model=ItemCreateSchema)
-async def add_item(request:Request, item: ItemCreateSchema, db: Session = Depends(get_db)):
+@item_router.post("/add/")
+async def add_item(request:Request, file: UploadFile = File(...), item: ItemCreateSchema = Depends(), db: Session = Depends(get_db)):
+    images_path = 'static/images'
+    if not os.path.exists(images_path):
+        os.mkdir(images_path)
+    image_path = os.path.join(images_path, file.filename)
+    with open(image_path, 'wb') as new_file:
+        shutil.copyfileobj(file.file, new_file)
+        file.file.close()
+        
     new_item = Item(
         name = item.name,
         description = item.description,
-        image = item.image,
+        image = image_path,
         category = item.category,
         price = item.price,
         quantity = item.quantity
@@ -44,8 +54,10 @@ async def add_item(request:Request, item: ItemCreateSchema, db: Session = Depend
     db.add(new_item)
     db.commit()
     db.refresh(new_item)
-    # return RedirectResponse(url="/app/login/", status_code=status.HTTP_302_FOUND)
-    return new_item
+    return {
+        'JSON Payload': item,
+        'filename': file.filename,
+    }
 
 # изменить товары
 @item_router.put(path='/update/')

@@ -15,7 +15,7 @@ class OrderCreateSchema(BaseModel):
 class ItemCreateSchema(BaseModel):
     name: str
     description: str
-    image: int
+    # image: str
     category: str
     price: float
     quantity: int
