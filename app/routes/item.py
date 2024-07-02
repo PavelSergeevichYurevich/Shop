@@ -22,14 +22,7 @@ templates = Jinja2Templates(directory="templates")
 @item_router.get("/show/", response_model=List[ItemCreateSchema])
 async def get_items(request:Request, db: Session = Depends(get_db)):
     stmnt = select(Item)
-    items:list = db.scalars(stmnt).all()
-    """  context:dict = {}
-    i:int = 1
-    for item in items:
-        new_el = {str(i): item.name}
-        context.update(new_el)
-        i += 1
-    return templates.TemplateResponse("users.html", {"request": request, "context": context}) """
+    items:list = db.scalars(stmnt)
     return items
 
 # создать товары

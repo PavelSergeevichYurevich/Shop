@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from sqlalchemy import ForeignKey
 from database.database import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -30,7 +30,7 @@ class Item(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     name: Mapped[str]
     description: Mapped[str]
-    image: Mapped[str]
+    image: Mapped[Optional[str]]
     data_create: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     data_change: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     category: Mapped[str]

@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel
 
 class CustomerCreateSchema(BaseModel):
@@ -15,7 +16,7 @@ class OrderCreateSchema(BaseModel):
 class ItemCreateSchema(BaseModel):
     name: str
     description: str
-    # image: str
+    image: Optional[str] = None
     category: str
     price: float
     quantity: int
