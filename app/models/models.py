@@ -8,7 +8,7 @@ class Customer(Base):
     __tablename__ = "customer"
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     email: Mapped[str]
-    password: Mapped[str]
+    hashed_password: Mapped[str]
     name: Mapped[str]
     data_create: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     data_change: Mapped[datetime] = mapped_column(default=datetime.utcnow)

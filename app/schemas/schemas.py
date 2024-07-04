@@ -3,8 +3,11 @@ from pydantic import BaseModel
 
 class CustomerCreateSchema(BaseModel):
     email: str
-    password: str
+    hashed_password: Optional[str] = None
     name: str
+    
+class CustomerSearchSchema(CustomerCreateSchema):
+    name: Optional[str] = None
     
 class CustomerUpdateSchema(CustomerCreateSchema):
     role: str

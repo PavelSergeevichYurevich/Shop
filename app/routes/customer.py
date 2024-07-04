@@ -6,9 +6,10 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
+from auth import hashing_pass
 from dependencies.dependency import get_db
 from models.models import Customer
-from schemas.schemas import CustomerCreateSchema, CustomerUpdateSchema
+from schemas.schemas import CustomerCreateSchema, CustomerSearchSchema, CustomerUpdateSchema
 
 customer_router = APIRouter(
     prefix='/customer',
@@ -16,26 +17,27 @@ customer_router = APIRouter(
 )
 templates = Jinja2Templates(directory="templates")
 
+# вывести пользoвателя
+@customer_router.post("/showuser/", response_model=CustomerCreateSchema)
+async def get_customer(request:Request, customer: CustomerSearchSchema, db: Session = Depends(get_db)):
+    stmnt = select(Customer).where((Customer.email == customer.email) & (Customer.password == customer.password))
+    user = db.scalars(stmnt).one()
+    return user
+
 # вывести пользoвателей
 @customer_router.get("/show/", response_model=List[CustomerCreateSchema])
 async def get_customers(request:Request, db: Session = Depends(get_db)):
     stmnt = select(Customer)
     users:list = db.scalars(stmnt).all()
-    """ context:dict = {}
-    i:int = 1
-    for user in users:
-        new_el = {str(i): user.name}
-        context.update(new_el)
-        i += 1
-    return templates.TemplateResponse("users.html", {"request": request, "context": context}) """
     return users
 
 # создать пользователя
 @customer_router.post("/add/", response_model=CustomerCreateSchema)
-async def add_customer(request:Request, customer: CustomerCreateSchema, db: Session = Depends(get_db)):
+async def add_customer(request:Request, customer: CustomerCreateSchema, password: str, db: Session = Depends(get_db)):
+    hashed_password = hashing_pass(password)
     new_customer = Customer(
         email = customer.email,
-        password = customer.password,
+        hashed_password = hashed_password,
         name = customer.name
     )
     db.add(new_customer)

@@ -2,12 +2,13 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import uvicorn
+# from app import auth
 from database.database import engine, Base
 from models.models import Customer, Order, Item, OrderItem
-from routes import auth, customer, item, order
+from routes import customer, item, order
 
 app = FastAPI(title='My Shop')
-app.include_router(auth.app_router)
+# app.include_router(auth.app_router)
 app.include_router(customer.customer_router)
 app.include_router(item.item_router)
 app.include_router(order.order_router)
