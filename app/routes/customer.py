@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
-from auth import hashing_pass
+from routes.auth import hashing_pass
 from dependencies.dependency import get_db
 from models.models import Customer
 from schemas.schemas import CustomerCreateSchema, CustomerSearchSchema, CustomerUpdateSchema
