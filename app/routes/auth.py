@@ -1,7 +1,7 @@
 from typing import Annotated
 import jwt
 from datetime import datetime, timedelta
-from fastapi import APIRouter, FastAPI, Depends, HTTPException
+from fastapi import APIRouter, FastAPI, Depends, HTTPException, Response
 from sqlalchemy import create_engine, select
 from dependencies.dependency import get_db
 from sqlalchemy.orm import Session
@@ -70,7 +70,7 @@ async def read_items(token: Annotated[str, Depends(oauth2_scheme)]):
     return {"token": token}
 
 @app_router.post('/token')
-def authenticate_user(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+def authenticate_user(response: Response,  form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     user = get_user(form_data.username) # Получите пользователя из базы данных
     if not user:
         raise HTTPException(status_code=400, detail="Incorrect username or password")
@@ -80,6 +80,7 @@ def authenticate_user(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
     if not is_password_correct:
         raise HTTPException(status_code=400, detail="Incorrect username or password")
     jwt_token = create_jwt_token({"sub": user.email})
+    response.set_cookie(key = user.email, value = jwt_token)
     return {"access_token": jwt_token, "token_type": "bearer"}
     
 

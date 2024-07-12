@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import uvicorn
-# from app import auth
 from database.database import engine, Base
 from models.models import Customer, Order, Item, OrderItem
 from routes import auth, customer, item, order
