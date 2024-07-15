@@ -17,7 +17,7 @@ app_router = APIRouter(
     tags=['auth']
 )
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 SECRET_KEY = "60dad50dcf49cdb04ff89b51a6c5b3abcb6eeba1a628b96b1f57c06a838d3383"
@@ -53,7 +53,7 @@ def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
     decoded_data = verify_jwt_token(token)
     if not decoded_data:
         raise HTTPException(status_code=400, detail="Invalid token")
-    user = get_user(decoded_data["sub"])  # Получите пользователя из базы данных
+    user = decoded_data.get('sub')  # Получите пользователя из базы данных
     if not user:
         raise HTTPException(status_code=400, detail="User not found")
     return user
