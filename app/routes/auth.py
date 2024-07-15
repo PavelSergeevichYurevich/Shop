@@ -1,7 +1,7 @@
 from typing import Annotated
 import jwt
 from datetime import datetime, timedelta
-from fastapi import APIRouter, FastAPI, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, FastAPI, Depends, HTTPException, Response
 from sqlalchemy import create_engine, select
 from dependencies.dependency import get_db
 from sqlalchemy.orm import Session
@@ -32,7 +32,6 @@ def get_user(email: str):
     user = db.scalars(stmnt).one()
     return user
     
-
 def create_jwt_token(data: dict):
     expiration = datetime.utcnow() + EXPIRATION_TIME
     data.update({"exp": expiration})
@@ -50,8 +49,6 @@ def hashing_pass(password: str):
     hashed_password = pwd_context.hash(password)
     return hashed_password
 
-
-
 def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
     decoded_data = verify_jwt_token(token)
     if not decoded_data:
@@ -64,10 +61,6 @@ def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
 @app_router.get("/users/me")
 def get_user_me(current_user: Annotated[Customer, Depends(get_current_user)]):
     return current_user
-
-@app_router.get("/items/")
-async def read_items(token: Annotated[str, Depends(oauth2_scheme)]):
-    return {"token": token}
 
 @app_router.post('/token')
 def authenticate_user(response: Response,  form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
@@ -82,6 +75,22 @@ def authenticate_user(response: Response,  form_data: Annotated[OAuth2PasswordRe
     jwt_token = create_jwt_token({"sub": user.email})
     response.set_cookie(key = user.email, value = jwt_token)
     return {"access_token": jwt_token, "token_type": "bearer"}
+
+@app_router.post('/admin')
+def get_user_role(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+    user = get_user(form_data.username) # Получите пользователя из базы данных
+    if not user:
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
+    is_password_correct = pwd_context.verify(form_data.password, user.hashed_password)
+    if not is_password_correct:
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
+    is_role_admin = user.role
+    if is_role_admin == 'admin':
+        return {user.email: is_role_admin}
+    else:
+        raise HTTPException(status_code=401, detail="User is not admin")
+
+    
     
 
 
