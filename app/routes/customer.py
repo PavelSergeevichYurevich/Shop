@@ -17,13 +17,6 @@ customer_router = APIRouter(
 )
 templates = Jinja2Templates(directory="templates")
 
-# вывести пользoвателя
-@customer_router.post("/showuser/", response_model=CustomerCreateSchema)
-async def get_customer(request:Request, customer: CustomerSearchSchema, db: Session = Depends(get_db)):
-    stmnt = select(Customer).where((Customer.email == customer.email) & (Customer.password == customer.password))
-    user = db.scalars(stmnt).one()
-    return user
-
 # вывести пользoвателей
 @customer_router.get("/show/", response_model=List[CustomerCreateSchema])
 async def get_customers(request:Request, db: Session = Depends(get_db)):
