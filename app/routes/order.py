@@ -28,7 +28,7 @@ async def get_items(request:Request, customer_id:int, db: Session = Depends(get_
 
 # создать заказ
 @order_router.post("/add/")
-async def add_order(request:Request, order: OrderCreateSchema, order_item: OrderItemSchema, db: Session = Depends(get_db)):
+async def add_order(request:Request, order: OrderCreateSchema, order_item: List[OrderItemSchema], db: Session = Depends(get_db)):
     new_order = Order(
         customer_id = order.customer_id, 
         status = order.status,
@@ -36,15 +36,15 @@ async def add_order(request:Request, order: OrderCreateSchema, order_item: Order
     db.add(new_order)
     db.commit()
     db.refresh(new_order)
-    
-    new_order_item = OrderItem(
-        order_id = new_order.id,
-        item_id = order_item.item_id,
-        quantity = order_item.quantity
-    )
-    db.add(new_order_item)
-    db.commit()
-    db.refresh(new_order_item)
+    for item in order_item:
+        new_order_item = OrderItem(
+            order_id = new_order.id,
+            item_id = item.item_id,
+            quantity = item.quantity
+        )
+        db.add(new_order_item)
+        db.commit()
+        db.refresh(new_order_item)
     # return RedirectResponse(url="/app/login/", status_code=status.HTTP_302_FOUND)
     return new_order
 
