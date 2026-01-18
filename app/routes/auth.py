@@ -1,20 +1,22 @@
-from typing import Annotated
-import sys
-print(sys.executable)
+from datetime import datetime, timedelta, timezone
+import os
+from pathlib import Path
+from typing import Annotated, Optional
+from dotenv import load_dotenv
 import jwt
-from datetime import datetime, timedelta
-from fastapi import APIRouter, Cookie, FastAPI, Depends, HTTPException, Response
-from sqlalchemy import create_engine, select
-from app.dependencies.dependency import get_db
-from sqlalchemy.orm import Session
-from fastapi.security import OAuth2PasswordBearer
-from passlib.context import CryptContext
-from models.models import Customer
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy.orm import sessionmaker
+from passlib.context import CryptContext
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
+from app.dependencies.dependency import get_db
+from app.models.models import Customer
 
-app_router = APIRouter(
+env_path = Path(__file__).resolve().parent / '.env'
+load_dotenv(dotenv_path=env_path)
+
+auth_router = APIRouter(
     prefix='/auth',
     tags=['auth']
 )
@@ -22,79 +24,82 @@ app_router = APIRouter(
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-SECRET_KEY = "60dad50dcf49cdb04ff89b51a6c5b3abcb6eeba1a628b96b1f57c06a838d3383"
+SECRET_KEY = os.getenv('SECRET_KEY')
 ALGORITHM = "HS256"
-EXPIRATION_TIME = timedelta(minutes=30)
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-def get_user(email: str):
-    engine = create_engine("sqlite:///./shop.db", echo=True)
-    SessionLocal = sessionmaker(autoflush=False, bind=engine)
-    db = SessionLocal()
-    stmnt = select(Customer).where(Customer.email == email)
-    user = db.scalars(stmnt).one()
-    return user
-    
-def create_jwt_token(data: dict):
-    expiration = datetime.utcnow() + EXPIRATION_TIME
-    data.update({"exp": expiration})
-    token = jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
-    return token
+# --- Утилиты ---
 
-def verify_jwt_token(token: str):
-    try:
-        decoded_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return decoded_data
-    except jwt.PyJWTError:
-        return None
-    
 def hashing_pass(password: str):
-    hashed_password = pwd_context.hash(password)
-    return hashed_password
+    return pwd_context.hash(password)
 
-def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
-    decoded_data = verify_jwt_token(token)
-    if not decoded_data:
-        raise HTTPException(status_code=400, detail="Invalid token")
-    user = decoded_data.get('sub')  # Получите пользователя из базы данных
-    if not user:
-        raise HTTPException(status_code=400, detail="User not found")
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def create_jwt_token(data: dict):
+    to_encode = data.copy()
+    # Используем современный способ работы с UTC (актуально для 2026)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+async def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)], 
+    db: Session = Depends(get_db)
+) -> Customer:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except jwt.PyJWTError:
+        raise credentials_exception
+        
+    # Ищем пользователя в БД через инъекцию зависимости db
+    user = db.scalar(select(Customer).where(Customer.email == email))
+    if user is None:
+        raise credentials_exception
     return user
 
-@app_router.get("/users/me")
-def get_user_me(current_user: Annotated[Customer, Depends(get_current_user)]):
+# Зависимость для проверки прав админа
+async def get_current_admin(current_user: Annotated[Customer, Depends(get_current_user)]):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Доступ только для администраторов")
     return current_user
 
-@app_router.post('/token')
-def authenticate_user(response: Response,  form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
-    user = get_user(form_data.username) # Получите пользователя из базы данных
-    if not user:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
+# --- Роутеры ---
 
-    is_password_correct = pwd_context.verify(form_data.password, user.hashed_password)
-
-    if not is_password_correct:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
-    jwt_token = create_jwt_token({"sub": user.email})
-    response.set_cookie(key = user.email, value = jwt_token)
-    return {"access_token": jwt_token, "token_type": "bearer"}
-
-@app_router.post('/admin')
-def get_user_role(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
-    user = get_user(form_data.username) # Получите пользователя из базы данных
-    if not user:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
-    is_password_correct = pwd_context.verify(form_data.password, user.hashed_password)
-    if not is_password_correct:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
-    is_role_admin = user.role
-    if is_role_admin == 'admin':
-        return {user.email: is_role_admin}
-    else:
-        raise HTTPException(status_code=401, detail="User is not admin")
-
+@auth_router.post('/token')
+def login_for_access_token(
+    response: Response, 
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    db: Session = Depends(get_db)
+):
+    # Поиск пользователя (используем db из зависимостей, а не создаем новую!)
+    user = db.scalar(select(Customer).where(Customer.email == form_data.username))
     
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Неверный email или пароль"
+        )
+
+    token = create_jwt_token({"sub": user.email})
     
+    # Установка Cookie (безопасный вариант)
+    response.set_cookie(
+        key="access_token", 
+        value=f"Bearer {token}", 
+        httponly=True, # Защита от кражи токена через JS (XSS)
+        max_age=1800
+    )
+    
+    return {"access_token": token, "token_type": "bearer"}
 
-
-
-
+@auth_router.get("/me")
+def read_users_me(current_user: Annotated[Customer, Depends(get_current_user)]):
+    return current_user
