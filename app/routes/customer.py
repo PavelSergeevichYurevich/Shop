@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from routes.auth import hashing_pass
 from dependencies.dependency import get_db
 from models.models import Customer
-from schemas.schemas import CustomerCreateSchema, CustomerSearchSchema, CustomerUpdateSchema
+from schemas.schemas import CustomerCreateSchema, CustomerUpdateSchema
 
 customer_router = APIRouter(
     prefix='/customer',

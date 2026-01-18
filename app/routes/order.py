@@ -1,86 +1,146 @@
-# роутер операция с заказами
-from datetime import datetime
 from typing import List
-from fastapi import APIRouter, Depends, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
-from sqlalchemy import delete, select, update
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
-from models.models import OrderItem
 from dependencies.dependency import get_db
-from models.models import Order
+from models.models import Order, OrderItem, Item
 from schemas.schemas import AddingItemSchema, DeletingItemSchema, OrderCreateSchema, OrderItemSchema, UpdatingItemSchema
 
+order_router = APIRouter(prefix='/order', tags=['Orders'])
 
-order_router = APIRouter(
-    prefix='/order',
-    tags=['Orders']
-)
-templates = Jinja2Templates(directory="templates")
-
-@order_router.get("/show/")
-async def get_items(request:Request, customer_id:int, db: Session = Depends(get_db)):
-    stmnt = select(Order).where(Order.customer_id == customer_id)
-    orders:list = db.scalars(stmnt).all()
-    for order in orders:
-        print(order.item)
+@order_router.get("/show/{customer_id}")
+def get_customer_orders(customer_id: int, db: Session = Depends(get_db)):
+    orders = db.scalars(select(Order).where(Order.customer_id == customer_id)).all()
     return orders
 
-# создать заказ
-@order_router.post("/add/")
-async def add_order(request:Request, order: OrderCreateSchema, order_item: List[OrderItemSchema], db: Session = Depends(get_db)):
-    new_order = Order(
-        customer_id = order.customer_id, 
-        status = order.status,
+@order_router.post("/add/", status_code=status.HTTP_201_CREATED)
+def add_order(order_data: OrderCreateSchema, items_data: List[OrderItemSchema], db: Session = Depends(get_db)):
+    # 1. Начинаем транзакцию (в SQLAlchemy 2.0 она начинается автоматически при работе с сессией)
+    try:
+        # Создаем "голову" заказа
+        new_order = Order(
+            customer_id=order_data.customer_id, 
+            status="pending" # Стандарт 2026: начальный статус всегда через код или БД
         )
-    db.add(new_order)
-    db.commit()
-    db.refresh(new_order)
-    for item in order_item:
-        new_order_item = OrderItem(
-            order_id = new_order.id,
-            item_id = item.item_id,
-            quantity = item.quantity
-        )
-        db.add(new_order_item)
+        db.add(new_order)
+        db.flush() # Получаем ID заказа, не фиксируя изменения в БД (без commit)
+
+        for item_info in items_data:
+            # 2. Проверяем наличие товара и фиксируем цену (Snapshot)
+            db_item = db.get(Item, item_info.item_id)
+            if not db_item:
+                raise HTTPException(status_code=404, detail=f"Товар {item_info.item_id} не найден")
+            
+            if db_item.quantity < item_info.quantity:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Недостаточно товара {db_item.name} на складе. В наличии: {db_item.quantity}"
+                )
+
+            # 3. Списываем остаток (Бизнес-логика)
+            db_item.quantity -= item_info.quantity
+            
+            # 4. Создаем строку заказа с фиксацией цены
+            new_order_item = OrderItem(
+                order_id=new_order.id,
+                item_id=db_item.id,
+                quantity=item_info.quantity,
+                price_at_purchase=db_item.price # Навык: защита от изменения цен в будущем
+            )
+            db.add(new_order_item)
+
+        # 5. Один финальный коммит для всей операции
         db.commit()
-        db.refresh(new_order_item)
-    # return RedirectResponse(url="/app/login/", status_code=status.HTTP_302_FOUND)
-    return new_order
+        db.refresh(new_order)
+        return new_order
 
-# удалить заказ
-@order_router.delete(path='/delete/')
-async def del_order(request:Request, id:int, db: Session = Depends(get_db)):
-    stmnt = delete(Order).where(Order.id == id)
-    order = db.execute(stmnt)
-    db.commit()
-    return order
+    except Exception as e:
+        db.rollback() # Если хоть что-то пошло не так — отменяем всё!
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail="Ошибка при создании заказа")
 
-#изменить заказ
-@order_router.put(path='/update/')
-async def update_order(request:Request, updating_item: UpdatingItemSchema, db: Session = Depends(get_db)):
-    stmnt = update(OrderItem).where((OrderItem.order_id == updating_item.order_id) & (OrderItem.item_id == updating_item.item_id)).values(
-        quantity = updating_item.new_quantity
-    )
-    updated_item = db.execute(stmnt)
+
+# Удалить заказ (с возвратом товара на склад)
+@order_router.delete('/delete/{id}')
+def del_order(id: int, db: Session = Depends(get_db)):
+    items_in_order = db.scalars(select(OrderItem).where(OrderItem.order_id == id)).all()
+    
+    for entry in items_in_order:
+        item = db.get(Item, entry.item_id)
+        if item:
+            item.quantity += entry.quantity # Возвращаем товар на склад
+            
+    result = db.execute(delete(Order).where(Order.id == id))
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+        
     db.commit()
-    return updated_item
+    return {"status": "deleted", "id": id}
+
+@order_router.put('/update/')
+def update_order_item(updating_item: UpdatingItemSchema, db: Session = Depends(get_db)):
+    # 1. Находим текущую строку в заказе (используем кортеж для составного ключа)
+    order_item = db.get(OrderItem, (updating_item.order_id, updating_item.item_id))
+    
+    if not order_item:
+        raise HTTPException(status_code=404, detail="Позиция в заказе не найдена")
+
+    # 2. Находим товар на складе
+    item = db.get(Item, order_item.item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Товар не найден на складе")
+
+    # 3. Считаем разницу (Delta)
+    # Если new > old: разница положительная (нужно еще списать со склада)
+    # Если new < old: разница отрицательная (нужно вернуть на склад)
+    diff = updating_item.new_quantity - order_item.quantity
+
+    # 4. Проверяем склад, если количество увеличивается
+    if diff > 0 and item.quantity < diff:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Недостаточно товара на складе. Можно добавить еще: {item.quantity}"
+        )
+
+    # 5. Обновляем склад и строку заказа
+    item.quantity -= diff # Если diff отрицательный, минус на минус даст плюс (возврат)
+    order_item.quantity = updating_item.new_quantity
+
+    db.commit()
+    db.refresh(order_item)
+    return order_item
 
 #удалить строку в заказе
 @order_router.delete(path='/deleteitem/')
-async def del_item(request:Request, deleting_item: DeletingItemSchema,db: Session = Depends(get_db)):
-    stmnt = delete(OrderItem).where((OrderItem.order_id == deleting_item.order_id ) & (OrderItem.item_id == deleting_item.item_id))
-    deleted_item = db.execute(stmnt)
+async def del_item(deleting_item: DeletingItemSchema, db: Session = Depends(get_db)):
+    # 1. Находим конкретную строку в заказе. 
+    # Так как ключ составной, передаем кортеж (order_id, item_id)
+    order_item = db.get(OrderItem, (deleting_item.order_id, deleting_item.item_id))
+    if not order_item:
+        raise HTTPException(status_code=404, detail="Строка в заказе не найдена")
+    # 2. Находим сам товар на складе
+    item = db.get(Item, order_item.item_id)
+    if item:
+        item.quantity += order_item.quantity 
+    db.delete(order_item)
     db.commit()
-    return deleted_item
+    return {"status": "success", "message": "Товар возвращен на склад, строка удалена"}
 
-#добавить строку в заказ
-@order_router.post(path='/additem/')
-async def add_item(request:Request, adding_item: AddingItemSchema,db: Session = Depends(get_db)):
+
+# Добавить строку в заказ (с фиксацией цены и списанием со склада)
+@order_router.post('/additem/')
+def add_item_to_order(adding_item: AddingItemSchema, db: Session = Depends(get_db)):
+    # 1. Проверяем товар и наличие
+    db_item = db.get(Item, adding_item.item_id)
+    if not db_item or db_item.quantity < adding_item.quantity:
+        raise HTTPException(status_code=400, detail="Товар недоступен или недостаточно на складе")
+    db_item.quantity -= adding_item.quantity
+    
     new_order_item = OrderItem(
         order_id = adding_item.order_id,
         item_id = adding_item.item_id,
-        quantity = adding_item.quantity
+        quantity = adding_item.quantity,
+        price_at_purchase = db_item.price # Snapshot Pricing!
     )
     db.add(new_order_item)
     db.commit()
