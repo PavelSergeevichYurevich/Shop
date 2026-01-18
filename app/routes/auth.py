@@ -1,9 +1,11 @@
 from typing import Annotated
+import sys
+print(sys.executable)
 import jwt
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Cookie, FastAPI, Depends, HTTPException, Response
 from sqlalchemy import create_engine, select
-from dependencies.dependency import get_db
+from app.dependencies.dependency import get_db
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext

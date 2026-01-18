@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 from sqlalchemy import ForeignKey
-from database.database import Base
+from app.database.database import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 class Customer(Base):
