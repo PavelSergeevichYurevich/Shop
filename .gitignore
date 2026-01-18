@@ -1,7 +1,2 @@
 /env
-/app/__pycache__
-/app/routes/__pycache__
-/app/schemas/__pycache__
-/app/models/__pycache__
-/app/database/__pycache__
-/app/dependencies/__pycache__
+**/__pycache__/
