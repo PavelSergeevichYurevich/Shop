@@ -54,11 +54,12 @@ def update_customer(
 
     update_data = customer_upd.model_dump(exclude_unset=True)
     
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Только админ может менять роли")
-
-
     for key, value in update_data.items():
+        if key == 'role':
+            # Проверяем роль ТОЛЬКО если её пытаются изменить
+            if value != db_customer.role and current_user.role != "admin":
+                raise HTTPException(status_code=403, detail="Только админ может менять роли")
+        
         if key == 'password':
             setattr(db_customer, 'hashed_password', hashing_pass(value))
         else:

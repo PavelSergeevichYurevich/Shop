@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.dependencies.dependency import get_db
 from app.models.models import Customer
 
-env_path = Path(__file__).resolve().parent / '.env'
+env_path = Path(__file__).resolve().parent.parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
 auth_router = APIRouter(
@@ -79,7 +79,6 @@ async def get_current_admin(current_user: Annotated[Customer, Depends(get_curren
     return current_user
 
 # --- Роутеры ---
-
 @auth_router.post('/token')
 def login_for_access_token(
     response: Response, 
