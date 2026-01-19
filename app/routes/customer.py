@@ -4,7 +4,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 from routes.auth import get_current_admin, get_current_user, hashing_pass
 from dependencies.dependency import get_db
-from models.models import Customer
+from app.models.models import Customer
 from schemas.schemas import CustomerCreateSchema, CustomerUpdateSchema, CustomerReadSchema
 
 

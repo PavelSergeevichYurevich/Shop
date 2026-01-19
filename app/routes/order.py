@@ -3,8 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
 from dependencies.dependency import get_db
-from models.models import Order, OrderItem, Item
-from schemas.schemas import AddingItemSchema, DeletingItemSchema, OrderCreateSchema, OrderItemSchema, UpdatingItemSchema
+from app.models.models import Order, OrderItem, Item
+from app.schemas.schemas import AddingItemSchema, DeletingItemSchema, OrderCreateSchema, OrderItemSchema, UpdatingItemSchema
 
 order_router = APIRouter(prefix='/order', tags=['Orders'])
 

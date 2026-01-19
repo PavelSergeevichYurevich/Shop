@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status
 from sqlalchemy import select, update, delete
 from sqlalchemy.orm import Session
 from dependencies.dependency import get_db
-from models.models import Item
+from app.models.models import Item
 from schemas.schemas import ItemCreateSchema, ItemUpdateSchema
 
 item_router = APIRouter(prefix='/item', tags=['Items'])

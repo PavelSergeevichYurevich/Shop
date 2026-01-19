@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 import os
 from pathlib import Path
 from typing import Annotated, Optional
+import bcrypt
 from dotenv import load_dotenv
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -31,10 +32,16 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 # --- Утилиты ---
 
 def hashing_pass(password: str):
-    return pwd_context.hash(password)
+    pwd_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed_password = bcrypt.hashpw(pwd_bytes, salt)
+    return hashed_password.decode('utf-8')
 
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return bcrypt.checkpw(
+        plain_password.encode('utf-8'), 
+        hashed_password.encode('utf-8')
+    )
 
 def create_jwt_token(data: dict):
     to_encode = data.copy()

@@ -24,7 +24,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-app.include_router(auth.app_router)
+app.include_router(auth.auth_router)
 app.include_router(customer.customer_router)
 app.include_router(item.item_router)
 app.include_router(order.order_router)
