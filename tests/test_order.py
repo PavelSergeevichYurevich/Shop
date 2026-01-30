@@ -40,7 +40,7 @@ def test_create_order_success_201(client, test_db):
     })
     assert response.status_code == 201
     data = response.json()
-    stmnt = select(OrderItem).where(OrderItem.order_id == data['order_id'], OrderItem.item_id == data['item_id'])
+    stmnt = select(OrderItem).where(OrderItem.order_id == data['id'], OrderItem.item_id == item.id)
     order_item = test_db.execute(stmnt).scalar_one_or_none()
     assert order_item is not None
     price_at_purchase = order_item.price_at_purchase
@@ -50,3 +50,5 @@ def test_create_order_success_201(client, test_db):
     new_price = item.price
     assert new_quantity == 8
     assert price_at_purchase == new_price
+    
+    
