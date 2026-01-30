@@ -2,7 +2,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
-from dependencies.dependency import get_db
+from app.dependencies.dependency import get_db
 from app.models.models import Order, OrderItem, Item
 from app.schemas.schemas import AddingItemSchema, DeletingItemSchema, OrderCreateSchema, OrderItemSchema, UpdatingItemSchema
 

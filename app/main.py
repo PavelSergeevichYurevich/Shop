@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
     print('Server stopped')
 
 app = FastAPI(
-    title='Exam ToDo Project',
+    title='Shop',
     lifespan=lifespan
 )
 
