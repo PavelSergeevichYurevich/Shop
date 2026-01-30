@@ -28,5 +28,6 @@ def test_db():
     yield db_session
     db_session.close()
     Base.metadata.drop_all(bind=test_engine)
+    test_engine.dispose()
     
     

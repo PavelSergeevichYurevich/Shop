@@ -66,7 +66,7 @@ def test_register_customer_duplicate_email(client, test_db):
     assert isinstance(data, dict)
     assert data['detail'] == 'Email уже зарегистрирован'
     
-def test_update_user(client, test_db):
+def test_update_customer_returns_404_if_customer_missing(client, test_db):
     customer1 = Customer(name='Test_name', 
                         email='test_email@test.ru', 
                         hashed_password='test_hashed_password'
@@ -74,12 +74,78 @@ def test_update_user(client, test_db):
     test_db.add(customer1)
     test_db.commit()
     test_db.refresh(customer1)
+    
     async def override_current_user(): return customer1
     app.dependency_overrides[get_current_user] = override_current_user
     response = client.put(url='/customer/update/999999', json={'name': 'new_name'})
     assert response.status_code == 404
     data = response.json()
     assert data['detail'] == 'Пользователь не найден'
+    del app.dependency_overrides[get_current_user]
+    
+def test_update_customer_returns_403_if_updating_other_user(client, test_db):
+    customer1 = Customer(name='Test_name', 
+                        email='test_email@test.ru', 
+                        hashed_password='test_hashed_password'
+    )
+    test_db.add(customer1)
+    test_db.commit()
+    test_db.refresh(customer1)
+    
+    customer2 = Customer(name='Test_name_1', 
+                        email='test_email_1@test.ru', 
+                        hashed_password='test_hashed_password_1'
+    )
+    test_db.add(customer2)
+    test_db.commit()
+    test_db.refresh(customer2)
+    
+    async def override_current_user(): return customer1
+    app.dependency_overrides[get_current_user] = override_current_user
+    
+    customer2_id = customer2.id
+    
+    response = client.put(url=f'/customer/update/{customer2_id}', json={'name': 'new_name'})
+    assert response.status_code == 403
+    data = response.json()
+    assert data['detail'] == 'Недостаточно прав'
+    
+    del app.dependency_overrides[get_current_user]
+    
+def test_update_customer_returns_200_if_updating_same_user(client, test_db):
+    customer1 = Customer(name='Test_name', 
+                        email='test_email@test.ru', 
+                        hashed_password='test_hashed_password'
+    )
+    test_db.add(customer1)
+    test_db.commit()
+    test_db.refresh(customer1)
+    
+    async def override_current_user(): return customer1
+    app.dependency_overrides[get_current_user] = override_current_user
+    
+    response = client.put(url=f'/customer/update/{customer1.id}', json={'name': 'new_name'})
+    assert response.status_code == 200
+    assert response.json()['name'] == 'new_name'
+    
+    del app.dependency_overrides[get_current_user]
+    
+def test_update_403_when_non_admin_tries_to_change_role(client, test_db):
+    customer1 = Customer(name='Test_name', 
+                        email='test_email@test.ru', 
+                        hashed_password='test_hashed_password'
+    )
+    test_db.add(customer1)
+    test_db.commit()
+    test_db.refresh(customer1)
+    
+    async def override_current_user(): return customer1
+    app.dependency_overrides[get_current_user] = override_current_user
+    
+    response = client.put(url=f'/customer/update/{customer1.id}', json={'role': 'admin'})
+    assert response.status_code == 403
+    assert response.json()['detail'] == 'Только админ может менять роли'
+    
     del app.dependency_overrides[get_current_user]
     
     

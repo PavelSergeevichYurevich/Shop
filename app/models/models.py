@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from sqlalchemy import ForeignKey, Numeric, String, text
 from decimal import Decimal
@@ -13,7 +13,7 @@ class Customer(Base):
     name: Mapped[str] = mapped_column(String(100))
     role: Mapped[str] = mapped_column(server_default='user') # Изменяем на server_default
     created_at: Mapped[datetime] = mapped_column(server_default=text("CURRENT_TIMESTAMP"))
-    updated_at: Mapped[datetime] = mapped_column(server_default=text("CURRENT_TIMESTAMP"), onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(server_default=text("CURRENT_TIMESTAMP"), onupdate=datetime.now(timezone.utc))
     orders: Mapped[List["Order"]] = relationship(back_populates='customer', cascade='all, delete-orphan')
 
 class Item(Base):
