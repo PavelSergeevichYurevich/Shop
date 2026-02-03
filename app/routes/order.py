@@ -63,17 +63,16 @@ def add_order(order_data: OrderCreateSchema, items_data: List[OrderItemSchema], 
 # Удалить заказ (с возвратом товара на склад)
 @order_router.delete('/delete/{id}')
 def del_order(id: int, db: Session = Depends(get_db)):
+    order = db.get(Order, id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
     items_in_order = db.scalars(select(OrderItem).where(OrderItem.order_id == id)).all()
     
     for entry in items_in_order:
         item = db.get(Item, entry.item_id)
         if item:
-            item.quantity += entry.quantity # Возвращаем товар на склад
-            
-    result = db.execute(delete(Order).where(Order.id == id))
-    if result.rowcount == 0:
-        raise HTTPException(status_code=404, detail="Заказ не найден")
-        
+            item.quantity += entry.quantity # Возвращаем товар на склад     
+    db.delete(order)
     db.commit()
     return {"status": "deleted", "id": id}
 
