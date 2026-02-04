@@ -28,7 +28,9 @@ app.include_router(auth.auth_router)
 app.include_router(customer.customer_router)
 app.include_router(item.item_router)
 app.include_router(order.order_router)
-app.mount("/static", StaticFiles(directory=Path(__file__).parent.absolute() / "static"), name="static")
+static_path = Path(__file__).parent.absolute() / "static"
+static_path.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 static_path = Path(__file__).parent.absolute() / "static"
 
