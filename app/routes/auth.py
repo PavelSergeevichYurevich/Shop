@@ -1,21 +1,16 @@
 from datetime import datetime, timedelta, timezone
-import os
-from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 import bcrypt
-from dotenv import load_dotenv
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from app.core.settings import settings
 
 from app.dependencies.dependency import get_db
 from app.models.models import Customer
 
-env_path = Path(__file__).resolve().parent.parent.parent / '.env'
-load_dotenv(dotenv_path=env_path)
 
 auth_router = APIRouter(
     prefix='/auth',
@@ -23,11 +18,6 @@ auth_router = APIRouter(
 )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-SECRET_KEY = os.getenv('SECRET_KEY')
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # --- Утилиты ---
 
@@ -46,9 +36,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def create_jwt_token(data: dict):
     to_encode = data.copy()
     # Используем современный способ работы с UTC (актуально для 2026)
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)], 
@@ -59,7 +49,7 @@ async def get_current_user(
         detail="Could not validate credentials",
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception

@@ -1,13 +1,10 @@
-import os
-from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.engine import Engine
 from sqlalchemy import event
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-DATABASE_URL = f"sqlite:///{BASE_DIR}/shop.db"
+from app.core.settings import settings
 
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
@@ -16,7 +13,7 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor.close()
 
 engine = create_engine(
-    DATABASE_URL, 
+    settings.DATABASE_URL, 
     connect_args={"check_same_thread": False}, 
     echo=False 
 )
