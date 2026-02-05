@@ -1,14 +1,28 @@
-version: '3.8'
+version: "3.8"
 
 services:
+  db:
+    image: postgres:16
+    container_name: shop_db
+    environment:
+      POSTGRES_DB: shop
+      POSTGRES_USER: shop_user
+      POSTGRES_PASSWORD: shop_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   app:
     build: .
-    container_name: shop_final_fixed
+    container_name: shop_app
     ports:
       - "8000:8000"
     env_file:
       - .env
-    volumes:
-      # Локальная база -> База внутри папки app в контейнере
-      - ./app/shop.db:/app_root/app/shop.db
+    depends_on:
+      - db
     restart: always
+
+volumes:
+  postgres_data:

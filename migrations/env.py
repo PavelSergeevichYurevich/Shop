@@ -8,6 +8,7 @@ from alembic import context
 from app.database.database import Base
 from app.models.models import Customer, Item, Order, OrderItem
 target_metadata = Base.metadata
+from app.core.settings import settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -27,9 +28,7 @@ if config.config_file_name is not None:
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
-BASE_DIR = Path(__file__).resolve().parent.parent
-db_path = f"sqlite:///{BASE_DIR}/app/shop.db"
-config.set_main_option("sqlalchemy.url", db_path)
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
@@ -72,7 +71,6 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection, 
             target_metadata=target_metadata,
-            render_as_batch=True
         )
 
         with context.begin_transaction():
