@@ -5,6 +5,8 @@ from sqlalchemy import StaticPool, create_engine
 from sqlalchemy.orm import sessionmaker
 from app.database.database import Base
 from app.dependencies.dependency import get_db
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 
 @pytest.fixture
@@ -21,6 +23,11 @@ def test_db():
                         connect_args={'check_same_thread': False},
                         poolclass=StaticPool
     )
+    @event.listens_for(Engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
     
     Base.metadata.create_all(bind=test_engine)
     TestSessionLocal = sessionmaker(bind=test_engine, autoflush=False, autocommit=False)

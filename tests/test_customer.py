@@ -64,7 +64,7 @@ def test_register_customer_duplicate_email(client, test_db):
     assert response.status_code == 400
     data = response.json()
     assert isinstance(data, dict)
-    assert data['detail'] == 'Email уже зарегистрирован'
+    assert data['error']['message'] == 'Email уже зарегистрирован'
     
 def test_update_customer_returns_404_if_customer_missing(client, test_db):
     customer1 = Customer(name='Test_name', 
@@ -80,7 +80,7 @@ def test_update_customer_returns_404_if_customer_missing(client, test_db):
     response = client.put(url='/customer/update/999999', json={'name': 'new_name'})
     assert response.status_code == 404
     data = response.json()
-    assert data['detail'] == 'Пользователь не найден'
+    assert data['error']['message'] == 'Пользователь не найден'
     del app.dependency_overrides[get_current_user]
     
 def test_update_customer_returns_403_if_updating_other_user(client, test_db):
@@ -108,7 +108,7 @@ def test_update_customer_returns_403_if_updating_other_user(client, test_db):
     response = client.put(url=f'/customer/update/{customer2_id}', json={'name': 'new_name'})
     assert response.status_code == 403
     data = response.json()
-    assert data['detail'] == 'Недостаточно прав'
+    assert data['error']['message'] == 'Недостаточно прав'
     
     del app.dependency_overrides[get_current_user]
     
@@ -144,7 +144,7 @@ def test_update_403_when_non_admin_tries_to_change_role(client, test_db):
     
     response = client.put(url=f'/customer/update/{customer1.id}', json={'role': 'admin'})
     assert response.status_code == 403
-    assert response.json()['detail'] == 'Только админ может менять роли'
+    assert response.json()['error']['message'] == 'Только админ может менять роли'
     
     del app.dependency_overrides[get_current_user]
     

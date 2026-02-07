@@ -37,7 +37,7 @@ def test_incorrect_password_401(client, test_db):
         
     })
     assert response.status_code == 401
-    assert response.json()['detail'] == 'Неверный email или пароль'
+    assert response.json()['error']['message'] == 'Неверный email или пароль'
     
 def test_auth_without_token_401(client, test_db):
     response = client.get('/auth/me')

@@ -86,7 +86,7 @@ def test_create_order_not_enough_quantity_400(client, test_db):
             }]
     })
     assert response.status_code == 400
-    assert response.json()['detail'] == 'Недостаточно товара Iphone 17 PRO на складе. В наличии: 1'
+    assert response.json()['error']['message'] == 'Недостаточно товара Iphone 17 PRO на складе. В наличии: 1'
     
 def test_update_order_item_quantity_decrease_200(client, test_db):
     customer = Customer(name=NAME, 
@@ -174,7 +174,7 @@ def test_update_order_item_400_not_enough_items(client, test_db):
         'new_quantity': 11
     })
     assert response.status_code == 400
-    assert response.json()['detail'] == 'Недостаточно товара на складе. Можно добавить еще: 7'
+    assert response.json()['error']['message'] == 'Недостаточно товара на складе. Можно добавить еще: 7'
     stmnt = select(Item).where(Item.id == item.id)
     item_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
     assert item_quantity == 7
@@ -233,7 +233,7 @@ def test_delete_order_returns_stock_and_removes_order_200(client, test_db):
 def test_delete_order_is_not_exist_404(client, test_db):
     response = client.delete('/order/delete/99999')
     assert response.status_code == 404
-    assert response.json()['detail'] == 'Заказ не найден'
+    assert response.json()['error']['message'] == 'Заказ не найден'
     
 def test_delete_item_with_return_200(client, test_db):
     customer = Customer(
@@ -312,7 +312,7 @@ def test_delete_item_not_found_404(client, test_db):
     })
     
     assert response.status_code == 404
-    assert response.json()['detail'] == 'Строка в заказе не найдена'
+    assert response.json()['error']['message'] == 'Строка в заказе не найдена'
     
 def test_add_item_quantity_decrease_200(client, test_db):
     customer = Customer(
@@ -398,7 +398,7 @@ def test_add_item_quantity_not_enough_400(client, test_db):
     })
     
     assert response.status_code == 400
-    assert response.json()['detail'] == 'Товар недоступен или недостаточно на складе'
+    assert response.json()['error']['message'] == 'Товар недоступен или недостаточно на складе'
     stmnt = select(Item).where(Item.id == item.id)
     item_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
     assert item_quantity == 10
@@ -484,7 +484,7 @@ def test_add_order_with_item_not_exist_404(client, test_db):
     })
     
     assert response.status_code == 404
-    assert response.json()['detail'] == 'Товар 999999 не найден'
+    assert response.json()['error']['message'] == 'Товар 999999 не найден'
     
 def test_order_update_item_not_found_404(client, test_db):
     response = client.put('/order/update/', json={
@@ -493,7 +493,7 @@ def test_order_update_item_not_found_404(client, test_db):
         "new_quantity": 1
     })
     assert response.status_code == 404
-    assert response.json()['detail'] == 'Позиция в заказе не найдена'
+    assert response.json()['error']['message'] == 'Позиция в заказе не найдена'
     
 def test_create_order_wrong_500(client, test_db, monkeypatch):
     response = client.post('/order/add/', json={
@@ -504,7 +504,7 @@ def test_create_order_wrong_500(client, test_db, monkeypatch):
         'items_data': []
     })
     assert response.status_code == 500
-    assert response.json()['detail'] == 'Ошибка при создании заказа'
+    assert response.json()['error']['message'] == 'Ошибка при создании заказа'
     
 def test_item_not_found_404(client, test_db, monkeypatch):
     customer = Customer(name=NAME, 
@@ -558,7 +558,7 @@ def test_item_not_found_404(client, test_db, monkeypatch):
     })
     
     assert response.status_code == 404
-    assert response.json()['detail'] == 'Товар не найден на складе'
+    assert response.json()['error']['message'] == 'Товар не найден на складе'
     
     
 

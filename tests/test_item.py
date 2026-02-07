@@ -88,7 +88,7 @@ def test_delete_item_200(client, test_db, tmp_path):
 def test_delete_item_not_exists_404(client, test_db):
     response = client.delete('/item/delete/999999')
     assert response.status_code == 404
-    assert response.json()['detail'] == 'Товар не найден'
+    assert response.json()['error']['message'] == 'Товар не найден'
     
     
     
