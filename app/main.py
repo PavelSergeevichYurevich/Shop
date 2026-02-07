@@ -5,6 +5,10 @@ import uvicorn
 from contextlib import asynccontextmanager
 from app.routes import auth, customer, item, order
 from app.core.settings import settings
+from app.core.errors import http_exception_handler, request_validation_error_handler, exception_handler
+from fastapi import HTTPException
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -24,6 +28,11 @@ app.include_router(order.order_router)
 static_path = Path(__file__).parent.absolute() / "static"
 static_path.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_path), name="static")
+
+app.exception_handler(HTTPException)(http_exception_handler)
+app.exception_handler(RequestValidationError)(request_validation_error_handler)
+app.exception_handler(Exception)(exception_handler)
+app.exception_handler(StarletteHTTPException)(http_exception_handler)
 
 if __name__ == '__main__':
     

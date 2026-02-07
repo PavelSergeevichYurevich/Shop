@@ -6,14 +6,14 @@ Move the current FastAPI pet project closer to production standards without over
 ## Week 1 — Solid Foundation
 
 ### Day 1: Config and environment
-- [ ] Move all critical settings to typed config (`pydantic-settings`): DB URL, JWT secret, token TTL, app env.
+- [x] Move all critical settings to typed config (`pydantic-settings`): DB URL, JWT secret, token TTL, app env.
 - [ ] Add strict startup checks (fail fast if required secrets are missing).
-- [ ] Split configs for `dev` / `test` / `prod`.
+- [x] Split configs for `dev` / `test` / `prod`.
 
 ### Day 2: Database and migrations
-- [ ] Prepare PostgreSQL runtime config (keep SQLite only for tests if needed).
-- [ ] Validate and clean Alembic flow (generate + apply migration in CI/local).
-- [ ] Add DB indexes for frequent queries (orders by customer, items by category, etc.).
+- [x] Prepare PostgreSQL runtime config (keep SQLite only for tests if needed).
+- [x] Validate and clean Alembic flow (generate + apply migration in CI/local).
+- [x] Add DB indexes for frequent queries (orders by customer, items by category, etc.).
 
 ### Day 3: API hardening
 - [ ] Add global exception handlers with consistent error schema.
