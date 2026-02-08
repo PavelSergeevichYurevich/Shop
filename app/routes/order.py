@@ -15,6 +15,8 @@ def get_customer_orders(customer_id: int, db: Session = Depends(get_db)):
 
 @order_router.post("/add/", status_code=status.HTTP_201_CREATED)
 def add_order(order_data: OrderCreateSchema, items_data: List[OrderItemSchema], db: Session = Depends(get_db)):
+    if not items_data:
+        raise HTTPException(400, 'Список товаров пуст')
     # 1. Начинаем транзакцию (в SQLAlchemy 2.0 она начинается автоматически при работе с сессией)
     try:
         # Создаем "голову" заказа

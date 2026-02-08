@@ -148,6 +148,19 @@ def test_update_403_when_non_admin_tries_to_change_role(client, test_db):
     
     del app.dependency_overrides[get_current_user]
     
+def test_register_customer_wrong_format_email_422(client, test_db):
+    payload:dict = {
+        'email':'test_email_test.ru',
+        'password':'test_password',
+        'name': 'Test_name',
+    }
+    
+    response = client.post(url='/customer/register/', json=payload)
+    assert response.status_code == 422
+    assert response.json()['error']['code'] == 'validation_error'
+    details = response.json()['error']['details']
+    assert any('email' in err['loc'] for err in details)
+    
     
     
     

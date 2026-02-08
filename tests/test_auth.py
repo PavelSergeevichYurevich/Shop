@@ -66,6 +66,16 @@ def test_auth_with_token_200(client, test_db):
     assert response.status_code == 200
     assert response.json()['email'] == EMAIL
     assert response.json()['name'] == NAME
+
+def test_auth_without_field_422(client, test_db):
+    response = client.post(url='/auth/token', data={
+        'password':PASSWORD
+        
+    })
+    assert response.status_code == 422
+    assert response.json()['error']['code'] == 'validation_error'
+    details = response.json()['error']['details']
+    assert any('username' in err['loc'] for err in details)
     
     
     

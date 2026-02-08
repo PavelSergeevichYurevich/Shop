@@ -324,6 +324,17 @@ def test_add_item_quantity_decrease_200(client, test_db):
     test_db.commit()
     test_db.refresh(customer)
     
+    seed_item = Item(
+        name='Seed Item',
+        description='Seed Item',
+        price=1,
+        quantity=1,
+        category='Cell phones'
+    )
+    test_db.add(seed_item)
+    test_db.commit()
+    test_db.refresh(seed_item)
+
     item = Item(
         name='Iphone 17 PRO',
         description='Iphone 17 PRO',
@@ -340,7 +351,10 @@ def test_add_item_quantity_decrease_200(client, test_db):
             'customer_id': customer.id,
             'status': 'pending'
         },
-        'items_data': []
+        'items_data': [{
+            'item_id': seed_item.id,
+            'quantity': 1
+        }]
     })
     assert response.status_code == 201    
     order_id = response.json()['id']
@@ -370,6 +384,17 @@ def test_add_item_quantity_not_enough_400(client, test_db):
     test_db.commit()
     test_db.refresh(customer)
     
+    seed_item = Item(
+        name='Seed Item',
+        description='Seed Item',
+        price=1,
+        quantity=1,
+        category='Cell phones'
+    )
+    test_db.add(seed_item)
+    test_db.commit()
+    test_db.refresh(seed_item)
+
     item = Item(
         name='Iphone 17 PRO',
         description='Iphone 17 PRO',
@@ -386,7 +411,10 @@ def test_add_item_quantity_not_enough_400(client, test_db):
             'customer_id': customer.id,
             'status': 'pending'
         },
-        'items_data': []
+        'items_data': [{
+            'item_id': seed_item.id,
+            'quantity': 1
+        }]
     })
     assert response.status_code == 201    
     order_id = response.json()['id']
@@ -496,12 +524,26 @@ def test_order_update_item_not_found_404(client, test_db):
     assert response.json()['error']['message'] == 'Позиция в заказе не найдена'
     
 def test_create_order_wrong_500(client, test_db, monkeypatch):
+    item = Item(
+        name='Iphone 17 PRO',
+        description='Iphone 17 PRO',
+        price=100,
+        quantity=10,
+        category='Cell phones'
+    )
+    test_db.add(item)
+    test_db.commit()
+    test_db.refresh(item)
+
     response = client.post('/order/add/', json={
         'order_data': {
             'customer_id': 99999,
             'status': 'pending'
         },
-        'items_data': []
+        'items_data': [{
+            'item_id': item.id,
+            'quantity': 1
+        }]
     })
     assert response.status_code == 500
     assert response.json()['error']['message'] == 'Ошибка при создании заказа'
@@ -559,6 +601,27 @@ def test_item_not_found_404(client, test_db, monkeypatch):
     
     assert response.status_code == 404
     assert response.json()['error']['message'] == 'Товар не найден на складе'
+    
+def test_create_order_empty_items_400(client, test_db):
+    customer = Customer(name=NAME, 
+                        email=EMAIL, 
+                        hashed_password=PASSWORD
+    )
+    test_db.add(customer)
+    test_db.commit()
+    test_db.refresh(customer)
+    
+    response = client.post('/order/add/', json={
+        'order_data': {
+            'customer_id': customer.id,
+            'status': 'pending'
+        },
+        'items_data': []
+    })
+    
+    assert response.status_code == 400
+    assert response.json()['error']['code'] == 'bad_request'
+    assert response.json()['error']['message'] == 'Список товаров пуст'
     
     
 
