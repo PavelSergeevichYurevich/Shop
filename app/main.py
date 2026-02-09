@@ -9,12 +9,19 @@ from app.core.errors import http_exception_handler, request_validation_error_han
 from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+import logging
+
+logger = logging.getLogger('shop')
+logging.basicConfig(level=logging.INFO)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print('Starting server...')
+    logger.info('Starting server')
+    if not settings.SECRET_KEY or len(settings.SECRET_KEY) < 32:
+        raise RuntimeError('SECRET_KEY отсутствует или не соответствует')
     yield
-    print('Server stopped')
+    logger.info('Server stopped')
 
 app = FastAPI(
     title='Shop',

@@ -21,10 +21,11 @@ services:
     env_file:
       - .env.docker
     volumes:
-      - ./app:/app_root/app
+      - ./:/app_root
     depends_on:
       - db
     restart: always
+
 
 volumes:
   postgres_data:

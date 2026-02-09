@@ -16,12 +16,12 @@ Move the current FastAPI pet project closer to production standards without over
 - [x] Add DB indexes for frequent queries (orders by customer, items by category, etc.).
 
 ### Day 3: API hardening
-- [ ] Add global exception handlers with consistent error schema.
-- [ ] Add request validation edge cases to tests (bad payloads, malformed auth headers).
-- [ ] Normalize response models for all routers (avoid raw ORM responses).
+- [x] Add global exception handlers with consistent error schema.
+- [x] Add request validation edge cases to tests (bad payloads, malformed auth headers).
+- [x] Normalize response models for all routers (avoid raw ORM responses).
 
 ### Day 4: Security basics
-- [ ] Remove hardcoded secrets; use env-only.
+- [x] Remove hardcoded secrets; use env-only.
 - [ ] Add refresh token flow (access + refresh) and logout/revoke logic.
 - [ ] Add simple role checks where sensitive endpoints exist.
 
