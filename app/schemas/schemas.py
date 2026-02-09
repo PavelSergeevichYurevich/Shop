@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 
 # --- Схемы Пользователя ---
@@ -33,6 +33,11 @@ class ItemBase(BaseModel):
 class ItemCreateSchema(ItemBase):
     image: Optional[str] = None
 
+class ItemReadSchema(ItemBase):
+    id: int
+    image: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
 class ItemUpdateSchema(BaseModel):
     # Позволяет обновлять поля по отдельности
     name: Optional[str] = None
@@ -59,3 +64,17 @@ class DeletingItemSchema(BaseModel):
 
 class UpdatingItemSchema(DeletingItemSchema):
     new_quantity: int = Field(..., gt=0)
+    
+class OrderItemReadSchema(BaseModel):
+    item_id: int
+    price_at_purchase: Decimal = Field(..., gt=0)
+    quantity: int = Field(..., ge=0)
+    model_config = ConfigDict(from_attributes=True)
+
+class OrderReadSchema(BaseModel):
+    id: int
+    customer_id: int
+    status: str
+    items: List[OrderItemReadSchema]
+    model_config = ConfigDict(from_attributes=True)
+    

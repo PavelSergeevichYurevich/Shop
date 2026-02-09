@@ -72,7 +72,10 @@ def update_customer(
 # удалить пользователя
 @customer_router.delete(path='/delete/')
 async def del_customer(id:int, db: Session = Depends(get_db)):
-    stmnt = delete(Customer).where(Customer.id == id)
-    customer = db.execute(stmnt)
+    stmnt = select(Customer).where(Customer.id == id)
+    customer = db.execute(stmnt).scalar_one_or_none()
+    if not customer:
+        raise HTTPException(404, 'Пользователь не найден')
+    db.delete(customer)
     db.commit()
-    return customer
+    return {'status':'deleted', 'id': id}

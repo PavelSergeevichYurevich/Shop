@@ -10,6 +10,7 @@ from app.core.settings import settings
 
 from app.dependencies.dependency import get_db
 from app.models.models import Customer
+from app.schemas.schemas import CustomerReadSchema
 
 
 auth_router = APIRouter(
@@ -96,6 +97,6 @@ def login_for_access_token(
     
     return {"access_token": token, "token_type": "bearer"}
 
-@auth_router.get("/me")
+@auth_router.get("/me", response_model=CustomerReadSchema)
 def read_users_me(current_user: Annotated[Customer, Depends(get_current_user)]):
     return current_user

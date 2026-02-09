@@ -4,16 +4,16 @@ from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
 from app.dependencies.dependency import get_db
 from app.models.models import Order, OrderItem, Item
-from app.schemas.schemas import AddingItemSchema, DeletingItemSchema, OrderCreateSchema, OrderItemSchema, UpdatingItemSchema
+from app.schemas.schemas import AddingItemSchema, DeletingItemSchema, OrderCreateSchema, OrderItemReadSchema, OrderItemSchema, UpdatingItemSchema, OrderReadSchema
 
 order_router = APIRouter(prefix='/order', tags=['Orders'])
 
-@order_router.get("/show/{customer_id}")
+@order_router.get("/show/{customer_id}", response_model=List[OrderReadSchema])
 def get_customer_orders(customer_id: int, db: Session = Depends(get_db)):
     orders = db.scalars(select(Order).where(Order.customer_id == customer_id)).all()
     return orders
 
-@order_router.post("/add/", status_code=status.HTTP_201_CREATED)
+@order_router.post("/add/", status_code=status.HTTP_201_CREATED, response_model=OrderReadSchema)
 def add_order(order_data: OrderCreateSchema, items_data: List[OrderItemSchema], db: Session = Depends(get_db)):
     if not items_data:
         raise HTTPException(400, 'Список товаров пуст')
@@ -78,7 +78,7 @@ def del_order(id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "deleted", "id": id}
 
-@order_router.put('/update/')
+@order_router.put('/update/', response_model=OrderItemReadSchema)
 def update_order_item(updating_item: UpdatingItemSchema, db: Session = Depends(get_db)):
     # 1. Находим текущую строку в заказе (используем кортеж для составного ключа)
     order_item = db.get(OrderItem, (updating_item.order_id, updating_item.item_id))
@@ -129,7 +129,7 @@ async def del_item(deleting_item: DeletingItemSchema, db: Session = Depends(get_
 
 
 # Добавить строку в заказ (с фиксацией цены и списанием со склада)
-@order_router.post('/additem/')
+@order_router.post('/additem/', response_model=OrderItemReadSchema)
 def add_item_to_order(adding_item: AddingItemSchema, db: Session = Depends(get_db)):
     # 1. Проверяем товар и наличие
     db_item = db.get(Item, adding_item.item_id)

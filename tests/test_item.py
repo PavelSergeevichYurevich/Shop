@@ -52,7 +52,7 @@ def test_add_item_200(client, test_db):
     data = response.json()
     assert data['name'] == 'Iphone 17 PRO'
     assert data['category'] == 'Cell phones'
-    assert data['price'] == 100
+    assert float(data['price']) == 100.0
     assert data['quantity'] == 10
     stmnt = select(Item).where(Item.name == 'Iphone 17 PRO')
     result = test_db.execute(stmnt).scalar_one_or_none()

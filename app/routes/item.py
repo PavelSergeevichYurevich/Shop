@@ -7,20 +7,20 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.orm import Session
 from app.dependencies.dependency import get_db
 from app.models.models import Item
-from app.schemas.schemas import ItemCreateSchema, ItemUpdateSchema
+from app.schemas.schemas import ItemCreateSchema, ItemReadSchema
 
 item_router = APIRouter(prefix='/item', tags=['Items'])
 
 IMAGES_DIR = "static/images"
 
 # Показать товары
-@item_router.get("/show/", response_model=List[ItemCreateSchema])
+@item_router.get("/show/", response_model=List[ItemReadSchema])
 def get_items(db: Session = Depends(get_db)):
     items = db.scalars(select(Item)).all()
     return items
 
 # Создать товар
-@item_router.post("/add/", status_code=status.HTTP_201_CREATED)
+@item_router.post("/add/", status_code=status.HTTP_201_CREATED, response_model=ItemReadSchema)
 async def add_item(
     item: ItemCreateSchema = Depends(), 
     file: UploadFile = File(...), 
