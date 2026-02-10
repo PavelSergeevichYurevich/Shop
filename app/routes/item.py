@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status
 from sqlalchemy import select, update, delete
 from sqlalchemy.orm import Session
 from app.dependencies.dependency import get_db
-from app.models.models import Item
+from app.models.models import Customer, Item
 from app.schemas.schemas import ItemCreateSchema, ItemReadSchema
+from app.routes.auth import get_current_admin
 
 item_router = APIRouter(prefix='/item', tags=['Items'])
 
@@ -24,12 +25,14 @@ def get_items(db: Session = Depends(get_db)):
 async def add_item(
     item: ItemCreateSchema = Depends(), 
     file: UploadFile = File(...), 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db), 
+    current_user: Customer = Depends(get_current_admin)
 ):
     
     os.makedirs(IMAGES_DIR, exist_ok=True)
     
-   
+    if not file.filename:
+        raise HTTPException(status_code=400, detail='Файл не найден')
     file_extension = os.path.splitext(file.filename)[1]
     unique_filename = f"{uuid.uuid4()}{file_extension}"
     image_path = os.path.join(IMAGES_DIR, unique_filename)
@@ -54,7 +57,9 @@ async def add_item(
 
 # Удалить товар
 @item_router.delete('/delete/{item_id}')
-def del_item(item_id: int, db: Session = Depends(get_db)):
+def del_item(item_id: int, 
+             db: Session = Depends(get_db),
+             current_user: Customer = Depends(get_current_admin)):
     item = db.get(Item, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Товар не найден")
