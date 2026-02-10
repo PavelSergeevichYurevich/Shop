@@ -1,3 +1,8 @@
+from sqlalchemy import select
+from app.routes.auth import sha256_hash
+from app.models.models import RefreshTokens
+
+
 EMAIL = 'test_email@test.ru'
 PASSWORD = 'test_password'
 NAME = 'Test_name'
@@ -76,6 +81,80 @@ def test_auth_without_field_422(client, test_db):
     assert response.json()['error']['code'] == 'validation_error'
     details = response.json()['error']['details']
     assert any('username' in err['loc'] for err in details)
+    
+def test_logout_success_200(client, test_db):
+    payload = {
+        'email': EMAIL,
+        'password': PASSWORD,
+        'name': NAME,
+    }
+    response = client.post(url='/customer/register/', json=payload)
+    assert response.status_code == 200
+    
+    response = client.post(url='/auth/token', data={
+        'username': EMAIL,
+        'password':PASSWORD
+        
+    })
+    assert response.status_code == 200
+    refresh_token = response.cookies.get('refresh_token')
+    
+    response = client.post(url='/auth/logout/')
+    assert response.status_code == 200
+    assert response.json()['message'] == 'Logout success'
+    
+    incoming_hash = sha256_hash(refresh_token)
+    stmnt = select(RefreshTokens).where(RefreshTokens.token_hash == incoming_hash)
+    refresh_token_base = test_db.execute(stmnt).scalar_one_or_none()
+    assert refresh_token_base is not None
+    assert refresh_token_base.revoked is True
+    
+    set_cookies = response.headers.get("set-cookie")
+    assert set_cookies is not None
+    assert 'access_token=' in set_cookies
+    assert 'refresh_token=' in set_cookies
+    assert 'Max-Age=0' in set_cookies
+    assert 'expires=' in set_cookies.lower()
+    
+def test_logout_success_without_cookie_200(client, test_db):
+    response = client.post(url='/auth/logout/')
+    assert response.status_code == 200
+    assert response.json()['message'] == 'Logout success'
+    
+    set_cookies = response.headers.get("set-cookie")
+    assert set_cookies is not None
+    assert 'access_token=' in set_cookies
+    assert 'refresh_token=' in set_cookies
+    
+def test_refresh_after_logout_401(client, test_db):
+    payload = {
+        'email': EMAIL,
+        'password': PASSWORD,
+        'name': NAME,
+    }
+    response = client.post(url='/customer/register/', json=payload)
+    assert response.status_code == 200
+    
+    response = client.post(url='/auth/token', data={
+        'username': EMAIL,
+        'password':PASSWORD
+        
+    })
+    assert response.status_code == 200
+    
+    refresh_token = response.cookies.get('refresh_token')
+    assert refresh_token is not None
+    
+    response = client.post(url='/auth/logout/')
+    assert response.status_code == 200
+    assert response.json()['message'] == 'Logout success'
+    
+    response = client.post(url='/auth/refresh/')
+    assert response.status_code == 401
+    assert response.json()['error']['message'] == 'Не авторизован'
+    
+    
+    
     
     
     

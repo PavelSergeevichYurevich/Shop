@@ -22,7 +22,7 @@ Move the current FastAPI pet project closer to production standards without over
 
 ### Day 4: Security basics
 - [x] Remove hardcoded secrets; use env-only.
-- [ ] Add refresh token flow (access + refresh) and logout/revoke logic.
+- [x] Add refresh token flow (access + refresh) and logout/revoke logic.
 - [ ] Add simple role checks where sensitive endpoints exist.
 
 ### Day 5: Observability basics

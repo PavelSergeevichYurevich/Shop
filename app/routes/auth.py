@@ -39,6 +39,18 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         hashed_password.encode('utf-8')
     )
 
+def delete_cookies(response: Response):
+    response.delete_cookie(
+        key="refresh_token" 
+    )
+    
+    response.delete_cookie(
+        key="access_token" 
+    )
+    
+    return {'message': 'Logout success'}
+    
+
 def create_jwt_token(data: dict):
     to_encode = data.copy()
     # Используем современный способ работы с UTC (актуально для 2026)
@@ -189,5 +201,32 @@ def read_refresh_token(request: Request, response: Response, db: Session = Depen
     )
     
     return {"access_token": new_access_token, "token_type": "bearer"}
+
+@auth_router.post('/logout/')
+def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    refresh_token = request.cookies.get('refresh_token')
+    
+    if not refresh_token:
+       return delete_cookies(response)
+    
+    try: 
+        payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    except jwt.PyJWTError:
+        return delete_cookies(response)
+    
+    if payload.get('type') != 'refresh':
+        return delete_cookies(response)
+    
+    incoming_hash = sha256_hash(refresh_token)
+    stmnt = select(RefreshTokens).where(RefreshTokens.token_hash == incoming_hash, RefreshTokens.revoked.is_(False))
+    refresh_token_base = db.execute(stmnt).scalar_one_or_none()
+    
+    if not refresh_token_base:
+        return delete_cookies(response)
+
+    refresh_token_base.revoked = True
+    db.commit()
+  
+    return delete_cookies(response)
     
     
