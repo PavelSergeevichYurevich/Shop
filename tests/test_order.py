@@ -435,27 +435,42 @@ def test_add_item_quantity_not_enough_400(client, test_db):
     assert result is None
     
 def test_show_orders_with_no_orders_200(client, test_db):
-    customer = Customer(
-        name=NAME,
-        hashed_password=PASSWORD,
-        email=EMAIL
-    )
-    test_db.add(customer)
-    test_db.commit()
-    test_db.refresh(customer)
+    payload = {
+        'email': EMAIL,
+        'password': PASSWORD,
+        'name': NAME
+    }
+    response = client.post(url='/customer/register/', json=payload)
+    assert response.status_code == 200
     
-    response = client.get(f'/order/show/{customer.id}')
+    result = test_db.execute(select(Customer).where(Customer.email == EMAIL)).scalar_one_or_none()
+    assert result is not None
+    customer_id = result.id
+    assert customer_id is not None
+    
+    response = client.post(url='/auth/token', data={
+            'username': EMAIL,
+            'password': PASSWORD
+            
+        })
+    assert response.status_code == 200
+    token = response.json()['access_token']
+    assert token is not None
+    
+    response = client.get(f'/order/show/{customer_id}', 
+        headers={'Authorization': f'Bearer {token}'})
+    
     assert response.status_code == 200
     assert response.json() == []
     
-def test_show_orders_200(client, test_db):
-    customer = Customer(name=NAME, 
-                        email=EMAIL, 
-                        hashed_password=PASSWORD
-    )
-    test_db.add(customer)
-    test_db.commit()
-    test_db.refresh(customer)
+def test_show_orders_200_owner(client, test_db):
+    payload = {
+        'email': EMAIL,
+        'password': PASSWORD,
+        'name': NAME
+    }
+    response = client.post(url='/customer/register/', json=payload)
+    assert response.status_code == 200
     
     item = Item(
         name='Iphone 17 PRO',
@@ -469,9 +484,14 @@ def test_show_orders_200(client, test_db):
     test_db.commit()
     test_db.refresh(item)
     
+    result = test_db.execute(select(Customer).where(Customer.email == EMAIL)).scalar_one_or_none()
+    assert result is not None
+    customer_id = result.id
+    assert customer_id is not None
+    
     response = client.post('/order/add/', json={
         'order_data': {
-            'customer_id': customer.id,
+            'customer_id': customer_id,
             'status': 'pending'
         },
         'items_data': [{
@@ -483,7 +503,18 @@ def test_show_orders_200(client, test_db):
     assert response.status_code == 201
     order_id = response.json()['id']
     
-    response = client.get(f'/order/show/{customer.id}')
+    response = client.post(url='/auth/token', data={
+            'username': EMAIL,
+            'password': PASSWORD
+            
+        })
+    assert response.status_code == 200
+    token = response.json()['access_token']
+    assert token is not None
+    
+    response = client.get(f'/order/show/{customer_id}', 
+        headers={'Authorization': f'Bearer {token}'}
+    )
     assert response.status_code == 200
     orders = response.json()
     assert len(orders) > 0

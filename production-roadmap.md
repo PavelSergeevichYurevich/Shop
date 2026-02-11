@@ -1,84 +1,50 @@
-# Production Readiness Roadmap (2 Weeks)
+# Чеклист завершения Shop для портфолио
 
-## Goal
-Move the current FastAPI pet project closer to production standards without overengineering.
+## Цель
+Закрыть только те задачи, которые реально усиливают проект под резюме Junior+/product-oriented backend.
 
-## Week 1 — Solid Foundation
+## Текущее состояние (по факту)
+- Auth: реализованы access + refresh + logout/revoke.
+- БД: настроены PostgreSQL runtime и Alembic-миграции.
+- API hardening: есть единая схема ошибок и response models.
+- Тесты: покрытие высокое, но сейчас есть 1 падающий тест после изменений политики доступа (`order/show` теперь требует auth).
+- CI: базовый GitHub Actions есть (`pytest --cov`), но без строгих quality-gates.
 
-### Day 1: Config and environment
-- [x] Move all critical settings to typed config (`pydantic-settings`): DB URL, JWT secret, token TTL, app env.
-- [ ] Add strict startup checks (fail fast if required secrets are missing).
-- [x] Split configs for `dev` / `test` / `prod`.
+## Обязательный минимум (для убедительного резюме)
 
-### Day 2: Database and migrations
-- [x] Prepare PostgreSQL runtime config (keep SQLite only for tests if needed).
-- [x] Validate and clean Alembic flow (generate + apply migration in CI/local).
-- [x] Add DB indexes for frequent queries (orders by customer, items by category, etc.).
+### 1) Довести RBAC и вернуть полностью зеленые тесты
+- [ ] Завершить role checks на чувствительных эндпоинтах (`customer`, `item`, `order/show` с политикой owner/admin).
+- [ ] Обновить интеграционные тесты под новую политику доступа (`401/403/200` сценарии).
+- [ ] Добиться полностью зеленого прогона тестов локально и в CI.
 
-### Day 3: API hardening
-- [x] Add global exception handlers with consistent error schema.
-- [x] Add request validation edge cases to tests (bad payloads, malformed auth headers).
-- [x] Normalize response models for all routers (avoid raw ORM responses).
+### 2) Подтянуть CI до демонстрируемого базового уровня
+- [ ] Оставить `pytest --cov` в CI и добавить минимальный порог покрытия (`--cov-fail-under`).
+- [ ] Добавить проверку `ruff` в CI.
+- [ ] Сохранить workflow простым и стабильным (без лишней флаки-нагрузки).
 
-### Day 4: Security basics
-- [x] Remove hardcoded secrets; use env-only.
-- [x] Add refresh token flow (access + refresh) and logout/revoke logic.
-- [ ] Add simple role checks where sensitive endpoints exist.
+### 3) Усилить читаемость проекта для найма
+- [ ] Обновить `README.md`:
+  - архитектура (FastAPI + SQLAlchemy + Postgres + Alembic),
+  - auth flow (login/refresh/logout),
+  - как запускать тесты и Docker.
+- [ ] Добавить короткий `RUNBOOK.md` с частыми командами (`docker compose up`, alembic, tests).
 
-### Day 5: Observability basics
-- [ ] Structured logging (JSON) with request id/correlation id.
-- [ ] Add `/health/live` and `/health/ready`.
-- [ ] Add Sentry (or similar) for runtime error tracking.
+### 4) Небольшой production-ish polish (дешево по усилиям, полезно как сигнал)
+- [ ] Добавить `/health/live` и `/health/ready`.
+- [ ] Удалить устаревший `version:` из `docker-compose.yml`, чтобы убрать предупреждения.
 
-### Day 6-7: CI quality gates
-- [ ] Extend GitHub Actions: `pytest`, coverage threshold, `ruff`, optional `mypy`.
-- [ ] Add security checks: `pip-audit` (and optionally `bandit`).
-- [ ] Ensure branch protection requires green CI checks.
+## Опционально (только если останется время)
+- [ ] Добавить `pip-audit` в CI.
+- [ ] Добавить более строгие startup-checks для обязательных секретов/env.
 
-## Week 2 — Background jobs and deployment shape
+## Что явно не нужно в этом цикле портфолио
+- Celery/Redis-очереди в этом проекте.
+- Kafka/event bus.
+- Полный прод-стек Nginx + gunicorn.
+- Бэкапы/rollback-учения.
+- Sentry/tracing-стек.
 
-### Day 8: Async tasks introduction (Celery)
-- [ ] Add Redis + Celery worker in `docker-compose`.
-- [ ] Move heavy/non-blocking operations (e.g., image processing) to Celery tasks.
-- [ ] Add task status/result endpoint if needed.
-
-### Day 9: Reliability for background jobs
-- [ ] Configure retries, exponential backoff, and dead-letter strategy (basic).
-- [ ] Add idempotency protection for repeated task triggers.
-- [ ] Add integration tests for task-triggering API paths.
-
-### Day 10: API performance and limits
-- [ ] Add rate limiting for auth and mutation endpoints.
-- [ ] Add pagination/filtering/sorting for list endpoints.
-- [ ] Optimize obvious N+1 patterns and query plans.
-
-### Day 11: Deployment baseline
-- [ ] Finalize Docker images (multi-stage if needed).
-- [ ] Add `gunicorn + uvicorn workers` settings for production run.
-- [ ] Put reverse proxy in front (Nginx) with proper timeouts and static handling.
-
-### Day 12: Data and backup readiness
-- [ ] Define PostgreSQL backup strategy (daily dump + restore test).
-- [ ] Add migration rollback checklist.
-- [ ] Document maintenance commands.
-
-### Day 13: Documentation for ops and onboarding
-- [ ] Add `RUNBOOK.md`: startup, common failures, rollback steps.
-- [ ] Add API auth flow docs (login/refresh/logout) with examples.
-- [ ] Update README with architecture and CI badges.
-
-### Day 14: Final production readiness check
-- [ ] Run full CI + smoke tests in clean environment.
-- [ ] Validate health endpoints, logs, and error alerts.
-- [ ] Freeze release checklist for v1.
-
-## What to postpone for now
-- Kafka/event bus (introduce only when you have multiple services and real event streaming needs).
-- Full microservices split.
-- Advanced tracing stack if team/project size is still small.
-
-## Minimal target after this roadmap
-- Stable CI with quality gates.
-- 90%+ business-logic test confidence retained.
-- Secure auth baseline and predictable deploy/runtime behavior.
-- Async workload handled via Celery + Redis.
+## Важно для синхронизации с резюме
+- В резюме оставлять только те технологии и практики, которые реально реализованы в этом репозитории.
+- Не заявлять Redis/Celery/Kafka для Shop, пока их нет в коде.
+- Если оставлять тезис про оптимизацию SQL-запросов, быть готовым показать конкретные места и измерения.

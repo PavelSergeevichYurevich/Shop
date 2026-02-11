@@ -3,14 +3,28 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
 from app.dependencies.dependency import get_db
-from app.models.models import Order, OrderItem, Item
+from app.models.models import Customer, Order, OrderItem, Item
 from app.schemas.schemas import AddingItemSchema, DeletingItemSchema, OrderCreateSchema, OrderItemReadSchema, OrderItemSchema, UpdatingItemSchema, OrderReadSchema
+from app.routes.auth import get_current_user
 
 order_router = APIRouter(prefix='/order', tags=['Orders'])
 
 @order_router.get("/show/{customer_id}", response_model=List[OrderReadSchema])
-def get_customer_orders(customer_id: int, db: Session = Depends(get_db)):
+def get_customer_orders(
+        customer_id: int, 
+        db: Session = Depends(get_db),
+        current_user: Customer = Depends(get_current_user)
+    ):
+    customer = db.get(Customer, customer_id)
+    if not customer:
+        raise HTTPException(404, 'Пользователь не найден')
+    
+    if current_user.role != 'admin':
+        if current_user.id != customer_id:
+            raise HTTPException(status_code=403, detail="Пользователь может просматривать только свои заказы. Администратор может просматривать любые.")
+        
     orders = db.scalars(select(Order).where(Order.customer_id == customer_id)).all()
+    
     return orders
 
 @order_router.post("/add/", status_code=status.HTTP_201_CREATED, response_model=OrderReadSchema)

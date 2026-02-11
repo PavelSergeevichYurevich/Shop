@@ -14,7 +14,7 @@ customer_router = APIRouter(
 )
 # вывести пользoвателей
 @customer_router.get("/show/", response_model=List[CustomerReadSchema])
-def get_customers(db: Session = Depends(get_db)):
+def get_customers(db: Session = Depends(get_db), current_user: Customer = Depends(get_current_admin)):
     users = db.scalars(select(Customer)).all()
     return users
 
@@ -71,7 +71,7 @@ def update_customer(
 
 # удалить пользователя
 @customer_router.delete(path='/delete/')
-async def del_customer(id:int, db: Session = Depends(get_db)):
+async def del_customer(id:int, db: Session = Depends(get_db), current_user: Customer = Depends(get_current_admin)):
     stmnt = select(Customer).where(Customer.id == id)
     customer = db.execute(stmnt).scalar_one_or_none()
     if not customer:

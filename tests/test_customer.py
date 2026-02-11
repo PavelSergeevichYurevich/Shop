@@ -3,31 +3,81 @@ from app.models.models import Customer
 from app.main import app
 from app.routes.auth import get_current_user
 
+EMAIL = 'test_email@test.ru'
+PASSWORD = 'test_password'
+NAME = 'Test_name'
 
-def test_show_customers(client, test_db):
-    customer = Customer(name='Test_name', 
-                        email='test_email@test.ru', 
-                        hashed_password='test_hashed_password'
-    )
-    test_db.add(customer)
-    test_db.commit()
-    test_db.refresh(customer)
-    
-    response = client.get('/customer/show/')
-    
+def test_show_customers_admin_200(client, test_db):
+    payload = {
+        'email': EMAIL,
+        'password': PASSWORD,
+        'name': NAME
+    }
+    response = client.post(url='/customer/register/', json=payload)
     assert response.status_code == 200
     
-    data = response.json()
-    assert isinstance(data, list)
-    assert len(data) == 1
-    assert data[0]['name'] == 'Test_name'
+    async def override_current_user(): return Customer(
+        name='Test_name', 
+        email='test_email@test.ru', 
+        hashed_password='test_hashed_password',
+        role='admin'
+    )
+    app.dependency_overrides[get_current_user] = override_current_user
+    
+    try:
+        
+        response = client.get('/customer/show/')
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        names = {u['name'] for u in data}
+        assert 'Test_name' in names
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        
+    
+def test_show_customers_not_admin_403(client, test_db):
+    payload = {
+        'email': EMAIL,
+        'password': PASSWORD,
+        'name': NAME
+    }
+    response = client.post(url='/customer/register/', json=payload)
+    assert response.status_code == 200
+    
+    response = client.post(url='/auth/token', data={
+            'username': EMAIL,
+            'password': PASSWORD
+            
+        })
+    assert response.status_code == 200
+    token = response.json()['access_token']
+    assert token is not None
+
+    response = client.get('/customer/show/', headers={
+            'Authorization': f'Bearer {token}'
+        })
+    assert response.status_code == 403
+    assert response.json()['error']['message'] == 'Доступ только для администраторов'
     
 def test_show_no_customers(client, test_db):
-    response = client.get('/customer/show/')
-    assert response.status_code == 200
-    data = response.json()
-    assert isinstance(data, list)
-    assert len(data) == 0
+    async def override_current_user(): return Customer(
+        name='Test_name', 
+        email='test_email@test.ru', 
+        hashed_password='test_hashed_password',
+        role='admin'
+    )
+    app.dependency_overrides[get_current_user] = override_current_user
+    
+    try:
+        response = client.get('/customer/show/')
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == 0
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        
     
 def test_register_customer_success(client, test_db):
     payload:dict = {
@@ -161,7 +211,65 @@ def test_register_customer_wrong_format_email_422(client, test_db):
     details = response.json()['error']['details']
     assert any('email' in err['loc'] for err in details)
     
+def test_delete_customer_not_admin_403(client, test_db):
+    payload = {
+        'email': EMAIL,
+        'password': PASSWORD,
+        'name': NAME
+    }
+    response = client.post(url='/customer/register/', json=payload)
+    assert response.status_code == 200
     
+    response = client.post(url='/auth/token', data={
+            'username': EMAIL,
+            'password': PASSWORD
+        })
+    assert response.status_code == 200
+    token = response.json()['access_token']
+    assert token is not None
+    
+    stmnt = select(Customer).where(Customer.email == EMAIL)
+    customer_id = test_db.execute(stmnt).scalar_one_or_none().id
+    assert customer_id is not None
+    
+    response = client.delete(f'/customer/delete/', params={'id': customer_id}, headers={
+        'Authorization': f'Bearer {token}'
+    })
+    
+    assert response.status_code == 403
+    assert response.json()['error']['message'] == 'Доступ только для администраторов'
+    
+def test_delete_customer_admin_200(client, test_db):
+    payload = {
+        'email': EMAIL,
+        'password': PASSWORD,
+        'name': NAME
+    }
+    response = client.post(url='/customer/register/', json=payload)
+    assert response.status_code == 200
+    
+    async def override_current_user(): return Customer(
+        name='Test_name', 
+        email='test_email@test.ru', 
+        hashed_password='test_hashed_password',
+        role='admin'
+    )
+    app.dependency_overrides[get_current_user] = override_current_user
+    
+    try:
+        stmnt = select(Customer).where(Customer.email == EMAIL)
+        result = test_db.execute(stmnt).scalar_one_or_none()
+        assert result is not None
+        customer_id = result.id
+        
+        response = client.delete('/customer/delete/', params={'id': customer_id})
+        assert response.status_code == 200
+        assert response.json()['status'] == 'deleted'
+        assert test_db.get(Customer, customer_id) is None
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        
+
     
     
     
