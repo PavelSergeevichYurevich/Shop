@@ -36,27 +36,14 @@ def test_show_customers_admin_200(client, test_db):
         app.dependency_overrides.pop(get_current_user, None)
         
     
-def test_show_customers_not_admin_403(client, test_db):
-    payload = {
-        'email': EMAIL,
-        'password': PASSWORD,
-        'name': NAME
-    }
-    response = client.post(url='/customer/register/', json=payload)
-    assert response.status_code == 200
-    
-    response = client.post(url='/auth/token', data={
-            'username': EMAIL,
-            'password': PASSWORD
-            
-        })
-    assert response.status_code == 200
-    token = response.json()['access_token']
-    assert token is not None
+def test_show_customers_not_admin_403(client, test_db, auth_user):
+    _, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
 
-    response = client.get('/customer/show/', headers={
-            'Authorization': f'Bearer {token}'
-        })
+    response = client.get('/customer/show/', headers=headers)
     assert response.status_code == 403
     assert response.json()['error']['message'] == 'Доступ только для администраторов'
     
@@ -211,30 +198,14 @@ def test_register_customer_wrong_format_email_422(client, test_db):
     details = response.json()['error']['details']
     assert any('email' in err['loc'] for err in details)
     
-def test_delete_customer_not_admin_403(client, test_db):
-    payload = {
-        'email': EMAIL,
-        'password': PASSWORD,
-        'name': NAME
-    }
-    response = client.post(url='/customer/register/', json=payload)
-    assert response.status_code == 200
+def test_delete_customer_not_admin_403(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
     
-    response = client.post(url='/auth/token', data={
-            'username': EMAIL,
-            'password': PASSWORD
-        })
-    assert response.status_code == 200
-    token = response.json()['access_token']
-    assert token is not None
-    
-    stmnt = select(Customer).where(Customer.email == EMAIL)
-    customer_id = test_db.execute(stmnt).scalar_one_or_none().id
-    assert customer_id is not None
-    
-    response = client.delete(f'/customer/delete/', params={'id': customer_id}, headers={
-        'Authorization': f'Bearer {token}'
-    })
+    response = client.delete(f'/customer/delete/', params={'id': customer_id}, headers=headers)
     
     assert response.status_code == 403
     assert response.json()['error']['message'] == 'Доступ только для администраторов'

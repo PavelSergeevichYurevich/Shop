@@ -1,4 +1,3 @@
-from pytest import MonkeyPatch
 from sqlalchemy import select
 from app.models.models import Customer, Item, Order, OrderItem
 
@@ -6,16 +5,8 @@ from app.models.models import Customer, Item, Order, OrderItem
 EMAIL = 'test_email@test.ru'
 PASSWORD = 'test_password'
 NAME = 'Test_name'
-
-def test_create_order_success_201(client, test_db):
-    customer = Customer(name=NAME, 
-                        email=EMAIL, 
-                        hashed_password=PASSWORD
-    )
-    test_db.add(customer)
-    test_db.commit()
-    test_db.refresh(customer)
     
+def test_create_order_success_201(client, test_db, auth_user):
     item = Item(
         name='Iphone 17 PRO',
         description='Iphone 17 PRO',
@@ -28,17 +19,25 @@ def test_create_order_success_201(client, test_db):
     test_db.commit()
     test_db.refresh(item)
     
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
+    
     response = client.post('/order/add/', json={
-        'order_data': {
-            'customer_id': customer.id,
-            'status': 'pending'
-        },
-        'items_data': [{
-            
-                'item_id': item.id,
-                'quantity': 2
+            'order_data': {
+                'customer_id': customer_id,
+                'status': 'pending'
+            },
+            'items_data': [{
+                
+                    'item_id': item.id,
+                    'quantity': 2
             }]
-    })
+        }, 
+        headers=headers
+    )
     assert response.status_code == 201
     data = response.json()
     stmnt = select(OrderItem).where(OrderItem.order_id == data['id'], OrderItem.item_id == item.id)
@@ -52,16 +51,62 @@ def test_create_order_success_201(client, test_db):
     assert new_quantity == 8
     assert price_at_purchase == new_price
     
+def test_create_order_for_another_user_403(client, test_db, auth_user):
+    _, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )  
+    payload = {
+        'email': 'test_email@email.com',
+        'password': 'test_password',
+        'name': 'test_name'
+    }
+    response = client.post(url='/customer/register/', json=payload)
+    assert response.status_code == 200
     
-def test_create_order_not_enough_quantity_400(client, test_db):
-    customer = Customer(name=NAME, 
-                        email=EMAIL, 
-                        hashed_password=PASSWORD
+    item = Item(
+        name='Iphone 17 PRO',
+        description='Iphone 17 PRO',
+        price=100,
+        quantity=10,
+        category='Cell phones'
+        
     )
-    test_db.add(customer)
+    test_db.add(item)
     test_db.commit()
-    test_db.refresh(customer)
+    test_db.refresh(item)
+        
+    stmnt = select(Customer).where(Customer.email == 'test_email@email.com')
+    customer_not_owner = test_db.execute(stmnt).scalar_one_or_none()
+    assert customer_not_owner is not None
     
+    response = client.post('/order/add/', json={
+            'order_data': {
+                'customer_id': customer_not_owner.id,
+                'status': 'pending'
+            },
+            'items_data': [{
+                
+                    'item_id': item.id,
+                    'quantity': 2
+            }]
+        }, 
+        headers=headers
+    )
+    assert response.status_code == 403
+    expected_message = (
+        'Пользователь может создавать заказы только для себя. '
+        'Администратор может создавать заказы для любых пользователей.'
+    )
+    assert response.json()['error']['message'] == expected_message
+
+def test_create_order_not_enough_quantity_400(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
     item = Item(
         name='Iphone 17 PRO',
         description='Iphone 17 PRO',
@@ -75,28 +120,27 @@ def test_create_order_not_enough_quantity_400(client, test_db):
     test_db.refresh(item)
     
     response = client.post('/order/add/', json={
-        'order_data': {
-            'customer_id': customer.id,
-            'status': 'pending'
-        },
-        'items_data': [{
-            
-                'item_id': item.id,
-                'quantity': 2
+            'order_data': {
+                'customer_id': customer_id,
+                'status': 'pending'
+            },
+            'items_data': [{
+                
+                    'item_id': item.id,
+                    'quantity': 2
             }]
-    })
+        },
+        headers=headers
+    )
     assert response.status_code == 400
     assert response.json()['error']['message'] == 'Недостаточно товара Iphone 17 PRO на складе. В наличии: 1'
     
-def test_update_order_item_quantity_decrease_200(client, test_db):
-    customer = Customer(name=NAME, 
-                        email=EMAIL, 
-                        hashed_password=PASSWORD
+def test_update_order_item_quantity_decrease_200(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
     )
-    test_db.add(customer)
-    test_db.commit()
-    test_db.refresh(customer)
-    
     item = Item(
         name='Iphone 17 PRO',
         description='Iphone 17 PRO',
@@ -110,16 +154,18 @@ def test_update_order_item_quantity_decrease_200(client, test_db):
     test_db.refresh(item)
     
     response = client.post('/order/add/', json={
-        'order_data': {
-            'customer_id': customer.id,
-            'status': 'pending'
-        },
-        'items_data': [{
-            
-                'item_id': item.id,
-                'quantity': 3
+            'order_data': {
+                'customer_id': customer_id,
+                'status': 'pending'
+            },
+            'items_data': [{
+                
+                    'item_id': item.id,
+                    'quantity': 3
             }]
-    })
+        },
+        headers=headers
+        )
     assert response.status_code == 201
     order_id = response.json()['id']
     response = client.put('/order/update/', json={
@@ -135,16 +181,12 @@ def test_update_order_item_quantity_decrease_200(client, test_db):
     new_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
     assert new_quantity == 1
     
-def test_update_order_item_400_not_enough_items(client, test_db):
-    customer = Customer(
-        name=NAME,
-        hashed_password=PASSWORD,
-        email=EMAIL
+def test_update_order_item_400_not_enough_items(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
     )
-    test_db.add(customer)
-    test_db.commit()
-    test_db.refresh(customer)
-    
     item = Item(
         name='Iphone 17 PRO',
         description='Iphone 17 PRO',
@@ -157,15 +199,17 @@ def test_update_order_item_400_not_enough_items(client, test_db):
     test_db.refresh(item)
     
     response = client.post('/order/add/', json={
-        'order_data': {
-            'customer_id': customer.id,
-            'status': 'pending'
-        },
-        'items_data': [{
-            'item_id': item.id,
-            'quantity': 3
-        }]
-    })
+            'order_data': {
+                'customer_id': customer_id,
+                'status': 'pending'
+            },
+            'items_data': [{
+                'item_id': item.id,
+                'quantity': 3
+            }]
+        }, 
+        headers=headers
+    )
     assert response.status_code == 201
     order_id = response.json()['id']
     response = client.put('/order/update/', json={
@@ -182,15 +226,12 @@ def test_update_order_item_400_not_enough_items(client, test_db):
     order_item_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
     assert order_item_quantity == 3
     
-def test_delete_order_returns_stock_and_removes_order_200(client, test_db):
-    customer = Customer(
-        name=NAME,
-        hashed_password=PASSWORD,
-        email=EMAIL
+def test_delete_order_returns_stock_and_removes_order_200(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
     )
-    test_db.add(customer)
-    test_db.commit()
-    test_db.refresh(customer)
     
     item = Item(
         name='Iphone 17 PRO',
@@ -204,15 +245,17 @@ def test_delete_order_returns_stock_and_removes_order_200(client, test_db):
     test_db.refresh(item)
     
     response = client.post('/order/add/', json={
-        'order_data': {
-            'customer_id': customer.id,
-            'status': 'pending'
-        },
-        'items_data': [{
-            'item_id': item.id,
-            'quantity': 3
-        }]
-    })
+                'order_data': {
+                    'customer_id': customer_id,
+                    'status': 'pending'
+                },
+                'items_data': [{
+                    'item_id': item.id,
+                    'quantity': 3
+                }]
+        }, 
+        headers=headers
+    )
     assert response.status_code == 201    
     order_id = response.json()['id']
     stmnt = select(Item).where(Item.id == item.id)
@@ -235,15 +278,12 @@ def test_delete_order_is_not_exist_404(client, test_db):
     assert response.status_code == 404
     assert response.json()['error']['message'] == 'Заказ не найден'
     
-def test_delete_item_with_return_200(client, test_db):
-    customer = Customer(
-        name=NAME,
-        hashed_password=PASSWORD,
-        email=EMAIL
+def test_delete_item_with_return_200(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
     )
-    test_db.add(customer)
-    test_db.commit()
-    test_db.refresh(customer)
     
     item = Item(
         name='Iphone 17 PRO',
@@ -257,15 +297,17 @@ def test_delete_item_with_return_200(client, test_db):
     test_db.refresh(item)
     
     response = client.post('/order/add/', json={
-        'order_data': {
-            'customer_id': customer.id,
-            'status': 'pending'
-        },
-        'items_data': [{
-            'item_id': item.id,
-            'quantity': 3
-        }]
-    })
+            'order_data': {
+                'customer_id': customer_id,
+                'status': 'pending'
+            },
+            'items_data': [{
+                'item_id': item.id,
+                'quantity': 3
+            }]
+        }, 
+        headers=headers
+    )
     assert response.status_code == 201    
     order_id = response.json()['id']
     stmnt = select(Item).where(Item.id == item.id)
@@ -314,15 +356,12 @@ def test_delete_item_not_found_404(client, test_db):
     assert response.status_code == 404
     assert response.json()['error']['message'] == 'Строка в заказе не найдена'
     
-def test_add_item_quantity_decrease_200(client, test_db):
-    customer = Customer(
-        name=NAME,
-        hashed_password=PASSWORD,
-        email=EMAIL
+def test_add_item_quantity_decrease_200(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
     )
-    test_db.add(customer)
-    test_db.commit()
-    test_db.refresh(customer)
     
     seed_item = Item(
         name='Seed Item',
@@ -347,15 +386,17 @@ def test_add_item_quantity_decrease_200(client, test_db):
     test_db.refresh(item)
     
     response = client.post('/order/add/', json={
-        'order_data': {
-            'customer_id': customer.id,
-            'status': 'pending'
+            'order_data': {
+                'customer_id': customer_id,
+                'status': 'pending'
+            },
+            'items_data': [{
+                'item_id': seed_item.id,
+                'quantity': 1
+            }]
         },
-        'items_data': [{
-            'item_id': seed_item.id,
-            'quantity': 1
-        }]
-    })
+        headers=headers
+    )
     assert response.status_code == 201    
     order_id = response.json()['id']
     
@@ -374,15 +415,12 @@ def test_add_item_quantity_decrease_200(client, test_db):
     item_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
     assert item_quantity == 8
     
-def test_add_item_quantity_not_enough_400(client, test_db):
-    customer = Customer(
-        name=NAME,
-        hashed_password=PASSWORD,
-        email=EMAIL
+def test_add_item_quantity_not_enough_400(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
     )
-    test_db.add(customer)
-    test_db.commit()
-    test_db.refresh(customer)
     
     seed_item = Item(
         name='Seed Item',
@@ -407,15 +445,17 @@ def test_add_item_quantity_not_enough_400(client, test_db):
     test_db.refresh(item)
     
     response = client.post('/order/add/', json={
-        'order_data': {
-            'customer_id': customer.id,
-            'status': 'pending'
-        },
-        'items_data': [{
-            'item_id': seed_item.id,
-            'quantity': 1
-        }]
-    })
+            'order_data': {
+                'customer_id': customer_id,
+                'status': 'pending'
+            },
+            'items_data': [{
+                'item_id': seed_item.id,
+                'quantity': 1
+            }]
+        }, 
+        headers=headers
+    )
     assert response.status_code == 201    
     order_id = response.json()['id']
     
@@ -434,40 +474,74 @@ def test_add_item_quantity_not_enough_400(client, test_db):
     result = test_db.execute(stmnt).scalar_one_or_none()
     assert result is None
     
-def test_show_orders_with_no_orders_200(client, test_db):
-    payload = {
-        'email': EMAIL,
-        'password': PASSWORD,
-        'name': NAME
-    }
-    response = client.post(url='/customer/register/', json=payload)
-    assert response.status_code == 200
-    
-    result = test_db.execute(select(Customer).where(Customer.email == EMAIL)).scalar_one_or_none()
-    assert result is not None
-    customer_id = result.id
-    assert customer_id is not None
-    
-    response = client.post(url='/auth/token', data={
-            'username': EMAIL,
-            'password': PASSWORD
-            
-        })
-    assert response.status_code == 200
-    token = response.json()['access_token']
-    assert token is not None
+def test_show_orders_with_no_orders_200(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
     
     response = client.get(f'/order/show/{customer_id}', 
-        headers={'Authorization': f'Bearer {token}'})
+        headers=headers)
     
     assert response.status_code == 200
     assert response.json() == []
     
-def test_show_orders_200_owner(client, test_db):
+def test_show_orders_200_owner(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
+    
+    item = Item(
+        name='Iphone 17 PRO',
+        description='Iphone 17 PRO',
+        price=100,
+        quantity=10,
+        category='Cell phones'
+        
+    )
+    test_db.add(item)
+    test_db.commit()
+    test_db.refresh(item)
+    
+    response = client.post('/order/add/', json={
+            'order_data': {
+                'customer_id': customer_id,
+                'status': 'pending'
+            },
+            'items_data': [{
+                
+                    'item_id': item.id,
+                    'quantity': 2
+            }]
+        }, 
+        headers=headers
+    )
+    assert response.status_code == 201
+    order_id = response.json()['id']
+    
+    response = client.get(f'/order/show/{customer_id}', 
+        headers=headers
+    )
+    assert response.status_code == 200
+    orders = response.json()
+    assert len(orders) > 0
+    order_ids = {order['id'] for order in orders}
+    assert order_id in order_ids
+    
+def test_show_orders_403_not_owner(client, test_db, auth_user):
+    owner_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
+    
     payload = {
-        'email': EMAIL,
-        'password': PASSWORD,
-        'name': NAME
+        'email': 'test_email@email.com',
+        'password': 'test_password',
+        'name': 'test_name'
     }
     response = client.post(url='/customer/register/', json=payload)
     assert response.status_code == 200
@@ -484,64 +558,63 @@ def test_show_orders_200_owner(client, test_db):
     test_db.commit()
     test_db.refresh(item)
     
-    result = test_db.execute(select(Customer).where(Customer.email == EMAIL)).scalar_one_or_none()
+    result = test_db.execute(select(Customer).where(Customer.email == 'test_email@email.com')).scalar_one_or_none()
     assert result is not None
-    customer_id = result.id
-    assert customer_id is not None
+    other_id = result.id
+    assert other_id is not None
     
     response = client.post('/order/add/', json={
-        'order_data': {
-            'customer_id': customer_id,
-            'status': 'pending'
-        },
-        'items_data': [{
-            
-                'item_id': item.id,
-                'quantity': 2
+            'order_data': {
+                'customer_id': owner_id,
+                'status': 'pending'
+            },
+            'items_data': [{
+                
+                    'item_id': item.id,
+                    'quantity': 2
             }]
-    })
+        }, 
+        headers=headers
+    )
     assert response.status_code == 201
-    order_id = response.json()['id']
     
     response = client.post(url='/auth/token', data={
-            'username': EMAIL,
-            'password': PASSWORD
+            'username': 'test_email@email.com',
+            'password': 'test_password'
             
         })
+    
     assert response.status_code == 200
     token = response.json()['access_token']
     assert token is not None
     
-    response = client.get(f'/order/show/{customer_id}', 
+    response = client.get(f'/order/show/{owner_id}', 
         headers={'Authorization': f'Bearer {token}'}
     )
-    assert response.status_code == 200
-    orders = response.json()
-    assert len(orders) > 0
-    order_ids = {order['id'] for order in orders}
-    assert order_id in order_ids
+    assert response.status_code == 403
+    assert response.json()['error']['message'] == 'Пользователь может просматривать только свои заказы. Администратор может просматривать любые.'
+
     
-def test_add_order_with_item_not_exist_404(client, test_db):
-    customer = Customer(name=NAME, 
-                        email=EMAIL, 
-                        hashed_password=PASSWORD
+def test_add_order_with_item_not_exist_404(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
     )
-    test_db.add(customer)
-    test_db.commit()
-    test_db.refresh(customer)
     
     response = client.post('/order/add/', json={
-        'order_data': {
-            'customer_id': customer.id,
-            'status': 'pending'
-        },
-        'items_data': [{
-            
-                'item_id': 999999,
-                'quantity': 2
+            'order_data': {
+                'customer_id': customer_id,
+                'status': 'pending'
+            },
+            'items_data': [{
+                
+                    'item_id': 999999,
+                    'quantity': 2
             }]
-    })
-    
+        },
+        headers=headers
+    )
     assert response.status_code == 404
     assert response.json()['error']['message'] == 'Товар 999999 не найден'
     
@@ -554,39 +627,13 @@ def test_order_update_item_not_found_404(client, test_db):
     assert response.status_code == 404
     assert response.json()['error']['message'] == 'Позиция в заказе не найдена'
     
-def test_create_order_wrong_500(client, test_db, monkeypatch):
-    item = Item(
-        name='Iphone 17 PRO',
-        description='Iphone 17 PRO',
-        price=100,
-        quantity=10,
-        category='Cell phones'
-    )
-    test_db.add(item)
-    test_db.commit()
-    test_db.refresh(item)
-
-    response = client.post('/order/add/', json={
-        'order_data': {
-            'customer_id': 99999,
-            'status': 'pending'
-        },
-        'items_data': [{
-            'item_id': item.id,
-            'quantity': 1
-        }]
-    })
-    assert response.status_code == 500
-    assert response.json()['error']['message'] == 'Ошибка при создании заказа'
     
-def test_item_not_found_404(client, test_db, monkeypatch):
-    customer = Customer(name=NAME, 
-                        email=EMAIL, 
-                        hashed_password=PASSWORD
+def test_item_not_found_404(client, test_db, monkeypatch, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
     )
-    test_db.add(customer)
-    test_db.commit()
-    test_db.refresh(customer)
     
     item = Item(
         name='Iphone 17 PRO',
@@ -601,16 +648,18 @@ def test_item_not_found_404(client, test_db, monkeypatch):
     test_db.refresh(item)
     
     response = client.post('/order/add/', json={
-        'order_data': {
-            'customer_id': customer.id,
-            'status': 'pending'
-        },
-        'items_data': [{
-            
-                'item_id': item.id,
-                'quantity': 2
+            'order_data': {
+                'customer_id': customer_id,
+                'status': 'pending'
+            },
+            'items_data': [{
+                
+                    'item_id': item.id,
+                    'quantity': 2
             }]
-    })
+        },
+        headers=headers
+    )
     assert response.status_code == 201
     order_id = response.json()['id']
     item_id = item.id
@@ -633,26 +682,115 @@ def test_item_not_found_404(client, test_db, monkeypatch):
     assert response.status_code == 404
     assert response.json()['error']['message'] == 'Товар не найден на складе'
     
-def test_create_order_empty_items_400(client, test_db):
-    customer = Customer(name=NAME, 
-                        email=EMAIL, 
-                        hashed_password=PASSWORD
+def test_create_order_empty_items_400(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
     )
-    test_db.add(customer)
-    test_db.commit()
-    test_db.refresh(customer)
     
     response = client.post('/order/add/', json={
-        'order_data': {
-            'customer_id': customer.id,
-            'status': 'pending'
+            'order_data': {
+                'customer_id': customer_id,
+                'status': 'pending'
+            },
+            'items_data': []
         },
-        'items_data': []
-    })
+        headers=headers
+    )
     
     assert response.status_code == 400
     assert response.json()['error']['code'] == 'bad_request'
     assert response.json()['error']['message'] == 'Список товаров пуст'
+    
+def test_show_orders_without_token_401(client, test_db):    
+    response = client.get(f'/order/show/1')
+    assert response.status_code == 401
+    
+def test_show_orders_admin_can_view_other_users_200(client, test_db, auth_user):
+    owner_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
+    
+    payload = {
+        'email': 'test_email@email.com',
+        'password': 'test_password',
+        'name': 'test_name'
+    }
+    response = client.post(url='/customer/register/', json=payload)
+    assert response.status_code == 200
+    
+    item = Item(
+        name='Iphone 17 PRO',
+        description='Iphone 17 PRO',
+        price=100,
+        quantity=10,
+        category='Cell phones'
+        
+    )
+    test_db.add(item)
+    test_db.commit()
+    test_db.refresh(item)
+    
+    result = test_db.execute(select(Customer).where(Customer.email == 'test_email@email.com')).scalar_one_or_none()
+    assert result is not None
+    admin_id = result.id
+    assert admin_id is not None
+    
+    response = client.post('/order/add/', json={
+            'order_data': {
+                'customer_id': owner_id,
+                'status': 'pending'
+            },
+            'items_data': [{
+                
+                    'item_id': item.id,
+                    'quantity': 2
+            }]
+        },
+        headers=headers
+    )
+    assert response.status_code == 201
+    order_id = response.json()['id']
+    
+    admin = test_db.get(Customer, admin_id)
+    assert admin is not None
+    admin.role = 'admin'
+    test_db.commit()
+    test_db.refresh(admin)
+    
+    response = client.post(url='/auth/token', data={
+            'username': 'test_email@email.com',
+            'password': 'test_password'
+            
+        })
+    
+    assert response.status_code == 200
+    token = response.json()['access_token']
+    assert token is not None
+    
+    response = client.get(f'/order/show/{owner_id}', 
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert response.status_code == 200
+    orders = response.json()
+    assert order_id in [o['id'] for o in orders]
+    
+def test_show_orders_with_no_customer_token_exists_404(client, test_db, auth_user):
+    _, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
+        
+    response = client.get(f'/order/show/99999999999', 
+        headers=headers)
+    
+    assert response.status_code == 404  
+    assert response.json()['error']['message'] == 'Пользователь не найден'    
+
     
     
 

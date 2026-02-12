@@ -28,7 +28,15 @@ def get_customer_orders(
     return orders
 
 @order_router.post("/add/", status_code=status.HTTP_201_CREATED, response_model=OrderReadSchema)
-def add_order(order_data: OrderCreateSchema, items_data: List[OrderItemSchema], db: Session = Depends(get_db)):
+def add_order(order_data: OrderCreateSchema, 
+              items_data: List[OrderItemSchema], 
+              db: Session = Depends(get_db),
+              current_user: Customer = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        if current_user.id != order_data.customer_id:
+            raise HTTPException(403, 
+                'Пользователь может создавать заказы только для себя. Администратор может создавать заказы для любых пользователей.'
+            )
     if not items_data:
         raise HTTPException(400, 'Список товаров пуст')
     # 1. Начинаем транзакцию (в SQLAlchemy 2.0 она начинается автоматически при работе с сессией)
