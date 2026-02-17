@@ -49,6 +49,22 @@ def delete_cookies(response: Response):
     )
     
     return {'message': 'Logout success'}
+
+
+def build_cookie_params(max_age: int) -> dict:
+    is_prod = settings.APP_ENV.lower() == "prod"
+    return {
+        "httponly": True,
+        "secure": is_prod,
+        "samesite": "lax",
+        "max_age": max_age,
+    }
+
+
+def normalize_to_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
     
 
 def create_jwt_token(data: dict):
@@ -128,14 +144,12 @@ def login_for_access_token(
     response.set_cookie(
         key="access_token", 
         value=f"Bearer {token}", 
-        httponly=True,
-        max_age=1800
+        **build_cookie_params(1800)
     )
     response.set_cookie(
         key="refresh_token", 
         value=refresh_token, 
-        httponly=True,
-        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400
+        **build_cookie_params(settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400)
     )
     
     return {"access_token": token, "token_type": "bearer"}
@@ -161,7 +175,8 @@ def read_refresh_token(request: Request, response: Response, db: Session = Depen
     
     if not refresh_token_base:
         raise HTTPException(401, 'Не авторизован')
-    if refresh_token_base.expires_at < datetime.utcnow():
+    expires_at = normalize_to_utc(refresh_token_base.expires_at)
+    if expires_at < datetime.now(timezone.utc):
         refresh_token_base.revoked = True
         db.commit()
         raise HTTPException(401, 'Не авторизован')
@@ -190,14 +205,12 @@ def read_refresh_token(request: Request, response: Response, db: Session = Depen
     response.set_cookie(
         key="access_token", 
         value=f"Bearer {new_access_token}", 
-        httponly=True,
-        max_age=1800
+        **build_cookie_params(1800)
     )
     response.set_cookie(
         key="refresh_token", 
         value=new_refresh_token, 
-        httponly=True,
-        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400
+        **build_cookie_params(settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400)
     )
     
     return {"access_token": new_access_token, "token_type": "bearer"}
