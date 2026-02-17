@@ -86,10 +86,17 @@ def add_order(order_data: OrderCreateSchema,
 
 # Удалить заказ (с возвратом товара на склад)
 @order_router.delete('/delete/{id}')
-def del_order(id: int, db: Session = Depends(get_db)):
+def del_order(id: int, 
+              db: Session = Depends(get_db),
+              current_user: Customer = Depends(get_current_user)):
     order = db.get(Order, id)
-    if order is None:
-        raise HTTPException(status_code=404, detail="Заказ не найден")
+    if not order:
+        raise HTTPException(404, 'Заказ не найден')
+    
+    if current_user.role != 'admin':
+        if current_user.id != order.customer_id:
+            raise HTTPException(status_code=403, detail="Пользователь может удалять только свои заказы. Администратор может удалять любые.")
+    
     items_in_order = db.scalars(select(OrderItem).where(OrderItem.order_id == id)).all()
     
     for entry in items_in_order:
@@ -101,12 +108,22 @@ def del_order(id: int, db: Session = Depends(get_db)):
     return {"status": "deleted", "id": id}
 
 @order_router.put('/update/', response_model=OrderItemReadSchema)
-def update_order_item(updating_item: UpdatingItemSchema, db: Session = Depends(get_db)):
+def update_order_item(updating_item: UpdatingItemSchema, 
+                      db: Session = Depends(get_db),
+                      current_user: Customer = Depends(get_current_user)):
     # 1. Находим текущую строку в заказе (используем кортеж для составного ключа)
+    
     order_item = db.get(OrderItem, (updating_item.order_id, updating_item.item_id))
     
     if not order_item:
         raise HTTPException(status_code=404, detail="Позиция в заказе не найдена")
+    
+    order = db.get(Order, order_item.order_id)
+    if not order:
+        raise HTTPException(404, 'Заказ не найден')
+    
+    if current_user.role != 'admin' and order.customer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Пользователь может править только свои заказы. Администратор может править любые.")
 
     # 2. Находим товар на складе
     item = db.get(Item, order_item.item_id)
@@ -135,9 +152,17 @@ def update_order_item(updating_item: UpdatingItemSchema, db: Session = Depends(g
 
 #удалить строку в заказе
 @order_router.delete(path='/deleteitem/')
-async def del_item(deleting_item: DeletingItemSchema, db: Session = Depends(get_db)):
+async def del_item(deleting_item: DeletingItemSchema, 
+                   db: Session = Depends(get_db),
+                   current_user: Customer = Depends(get_current_user)):
     # 1. Находим конкретную строку в заказе. 
     # Так как ключ составной, передаем кортеж (order_id, item_id)
+    order = db.get(Order, deleting_item.order_id)
+    if not order:
+        raise HTTPException(404, 'Заказ не найден')
+    if current_user.role != 'admin' and order.customer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Пользователь может удалять строки только в своих заказах. Администратор может удалять в любых.")
+    
     order_item = db.get(OrderItem, (deleting_item.order_id, deleting_item.item_id))
     if not order_item:
         raise HTTPException(status_code=404, detail="Строка в заказе не найдена")
@@ -152,7 +177,14 @@ async def del_item(deleting_item: DeletingItemSchema, db: Session = Depends(get_
 
 # Добавить строку в заказ (с фиксацией цены и списанием со склада)
 @order_router.post('/additem/', response_model=OrderItemReadSchema)
-def add_item_to_order(adding_item: AddingItemSchema, db: Session = Depends(get_db)):
+def add_item_to_order(adding_item: AddingItemSchema, 
+                      db: Session = Depends(get_db),
+                      current_user: Customer = Depends(get_current_user)):
+    order = db.get(Order, adding_item.order_id)
+    if not order:
+        raise HTTPException(404, 'Заказ не найден')
+    if current_user.role != 'admin' and order.customer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Пользователь может добавлять строки только в своих заказах. Администратор может добавлять в любых.")
     # 1. Проверяем товар и наличие
     db_item = db.get(Item, adding_item.item_id)
     if not db_item or db_item.quantity < adding_item.quantity:

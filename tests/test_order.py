@@ -172,7 +172,9 @@ def test_update_order_item_quantity_decrease_200(client, test_db, auth_user):
         'order_id': order_id,
         'item_id': item.id,
         'new_quantity': 1
-    })
+        },
+        headers=headers
+    )
     assert response.status_code == 200
     stmnt = select(Item).where((Item.id) == item.id)
     new_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
@@ -216,7 +218,9 @@ def test_update_order_item_400_not_enough_items(client, test_db, auth_user):
         'order_id': order_id,
         'item_id': item.id,
         'new_quantity': 11
-    })
+        },
+        headers=headers
+    )
     assert response.status_code == 400
     assert response.json()['error']['message'] == 'Недостаточно товара на складе. Можно добавить еще: 7'
     stmnt = select(Item).where(Item.id == item.id)
@@ -262,7 +266,7 @@ def test_delete_order_returns_stock_and_removes_order_200(client, test_db, auth_
     new_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
     assert new_quantity == 7
     
-    response = client.delete(f'/order/delete/{order_id}')
+    response = client.delete(f'/order/delete/{order_id}', headers=headers)
     assert response.status_code == 200
     assert response.json()['status'] == 'deleted'
     assert response.json()['id'] == order_id
@@ -273,8 +277,75 @@ def test_delete_order_returns_stock_and_removes_order_200(client, test_db, auth_
     order = test_db.execute(stmnt).scalar_one_or_none()
     assert order is None
     
-def test_delete_order_is_not_exist_404(client, test_db):
-    response = client.delete('/order/delete/99999')
+def test_delete_order_not_owner_403(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
+    
+    item = Item(
+        name='Iphone 17 PRO',
+        description='Iphone 17 PRO',
+        price=100,
+        quantity=10,
+        category='Cell phones'
+    )
+    test_db.add(item)
+    test_db.commit()
+    test_db.refresh(item)
+    
+    response = client.post('/order/add/', json={
+                'order_data': {
+                    'customer_id': customer_id,
+                    'status': 'pending'
+                },
+                'items_data': [{
+                    'item_id': item.id,
+                    'quantity': 3
+                }]
+        }, 
+        headers=headers
+    )
+    assert response.status_code == 201    
+    order_id = response.json()['id']
+    stmnt = select(Item).where(Item.id == item.id)
+    new_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
+    assert new_quantity == 7
+    
+    payload = {
+            'email': 'test_email@email.com',
+            'password': 'test_password',
+            'name': 'test_name'
+        }
+    response = client.post(url='/customer/register/', json=payload)
+    assert response.status_code == 200
+          
+    response = client.post(url='/auth/token', data={
+            'username': 'test_email@email.com',
+            'password': 'test_password'
+            
+        })
+        
+    assert response.status_code == 200
+    token = response.json()['access_token']
+    assert token is not None
+    headers = {'Authorization': f'Bearer {token}'}
+
+    response = client.delete(f'/order/delete/{order_id}', headers=headers)
+    assert response.status_code == 403
+    assert response.json()['error']['message'] == 'Пользователь может удалять только свои заказы. Администратор может удалять любые.'
+    assert test_db.get(Order, order_id) is not None
+    
+        
+        
+def test_delete_order_is_not_exist_404(client, test_db, auth_user):
+    _, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
+    response = client.delete('/order/delete/99999', headers=headers)
     assert response.status_code == 404
     assert response.json()['error']['message'] == 'Заказ не найден'
     
@@ -317,7 +388,9 @@ def test_delete_item_with_return_200(client, test_db, auth_user):
     response = client.request('DELETE', url='/order/deleteitem/', json={
         'order_id': order_id,
         'item_id': item.id
-    })
+        },
+        headers=headers
+    )
     assert response.status_code == 200
     assert response.json()['status'] == 'success'
     stmnt = select(OrderItem).where(OrderItem.order_id == order_id, OrderItem.item_id == item.id)
@@ -327,15 +400,12 @@ def test_delete_item_with_return_200(client, test_db, auth_user):
     item_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
     assert item_quantity == 10
     
-def test_delete_item_not_found_404(client, test_db):
-    customer = Customer(
-        name=NAME,
-        hashed_password=PASSWORD,
-        email=EMAIL
+def test_delete_item_not_found_404(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
     )
-    test_db.add(customer)
-    test_db.commit()
-    test_db.refresh(customer)
     
     item = Item(
         name='Iphone 17 PRO',
@@ -348,10 +418,26 @@ def test_delete_item_not_found_404(client, test_db):
     test_db.commit()
     test_db.refresh(item)
     
+    response = client.post('/order/add/', json={
+                'order_data': {
+                    'customer_id': customer_id,
+                    'status': 'pending'
+                },
+                'items_data': [{
+                    'item_id': item.id,
+                    'quantity': 3
+                }]
+        }, 
+        headers=headers
+    )
+    order_id = response.json()['id']
+    
     response = client.request('DELETE', url='/order/deleteitem/', json={
-        'order_id': 999999999,
+        'order_id': order_id,
         'item_id': 999999999
-    })
+        },
+        headers=headers
+    )
     
     assert response.status_code == 404
     assert response.json()['error']['message'] == 'Строка в заказе не найдена'
@@ -404,7 +490,9 @@ def test_add_item_quantity_decrease_200(client, test_db, auth_user):
         'order_id': order_id,
         'item_id': item.id,
         'quantity': 2
-    })
+        },
+        headers=headers
+    )
     
     assert response.status_code == 200
     stmnt = select(OrderItem).where(OrderItem.order_id == order_id, OrderItem.item_id == item.id)
@@ -463,7 +551,9 @@ def test_add_item_quantity_not_enough_400(client, test_db, auth_user):
         'order_id': order_id,
         'item_id': item.id,
         'quantity': 12
-    })
+        },
+        headers=headers
+    )
     
     assert response.status_code == 400
     assert response.json()['error']['message'] == 'Товар недоступен или недостаточно на складе'
@@ -618,12 +708,19 @@ def test_add_order_with_item_not_exist_404(client, test_db, auth_user):
     assert response.status_code == 404
     assert response.json()['error']['message'] == 'Товар 999999 не найден'
     
-def test_order_update_item_not_found_404(client, test_db):
+def test_order_update_item_not_found_404(client, test_db, auth_user):
+    _, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
     response = client.put('/order/update/', json={
         "order_id": 999999, 
         "item_id": 999999, 
         "new_quantity": 1
-    })
+        },
+        headers=headers
+    )
     assert response.status_code == 404
     assert response.json()['error']['message'] == 'Позиция в заказе не найдена'
     
@@ -677,7 +774,9 @@ def test_item_not_found_404(client, test_db, monkeypatch, auth_user):
         'order_id': order_id,
         'item_id': item_id,
         'new_quantity': 2
-    })
+        },
+        headers=headers
+    )
     
     assert response.status_code == 404
     assert response.json()['error']['message'] == 'Товар не найден на складе'
@@ -791,8 +890,425 @@ def test_show_orders_with_no_customer_token_exists_404(client, test_db, auth_use
     assert response.status_code == 404  
     assert response.json()['error']['message'] == 'Пользователь не найден'    
 
+def test_update_not_owner_403(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
+    
+    item = Item(
+        name='Iphone 17 PRO',
+        description='Iphone 17 PRO',
+        price=100,
+        quantity=10,
+        category='Cell phones'
+    )
+    test_db.add(item)
+    test_db.commit()
+    test_db.refresh(item)
+    
+    response = client.post('/order/add/', json={
+                'order_data': {
+                    'customer_id': customer_id,
+                    'status': 'pending'
+                },
+                'items_data': [{
+                    'item_id': item.id,
+                    'quantity': 3
+                }]
+        }, 
+        headers=headers
+    )
+    assert response.status_code == 201    
+    order_id = response.json()['id']
+    stmnt = select(Item).where(Item.id == item.id)
+    new_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
+    assert new_quantity == 7
+    
+    payload = {
+            'email': 'test_email@email.com',
+            'password': 'test_password',
+            'name': 'test_name'
+        }
+    response = client.post(url='/customer/register/', json=payload)
+    assert response.status_code == 200
+          
+    response = client.post(url='/auth/token', data={
+            'username': 'test_email@email.com',
+            'password': 'test_password'
+            
+        })
+        
+    assert response.status_code == 200
+    token = response.json()['access_token']
+    assert token is not None
+    headers = {'Authorization': f'Bearer {token}'}
+    response = client.put('/order/update/', json={
+        'order_id': order_id,
+        'item_id': item.id,
+        'new_quantity': 1
+        },
+        headers=headers
+    )
+    assert response.status_code == 403
+    assert response.json()['error']['message'] == 'Пользователь может править только свои заказы. Администратор может править любые.'
+    
+def test_update_not_owner_admin_200(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
+    
+    item = Item(
+        name='Iphone 17 PRO',
+        description='Iphone 17 PRO',
+        price=100,
+        quantity=10,
+        category='Cell phones'
+    )
+    test_db.add(item)
+    test_db.commit()
+    test_db.refresh(item)
+    
+    response = client.post('/order/add/', json={
+                'order_data': {
+                    'customer_id': customer_id,
+                    'status': 'pending'
+                },
+                'items_data': [{
+                    'item_id': item.id,
+                    'quantity': 3
+                }]
+        }, 
+        headers=headers
+    )
+    assert response.status_code == 201    
+    order_id = response.json()['id']
+    stmnt = select(Item).where(Item.id == item.id)
+    new_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
+    assert new_quantity == 7
+    
+    payload = {
+            'email': 'test_email@email.com',
+            'password': 'test_password',
+            'name': 'test_name'
+        }
+    response = client.post(url='/customer/register/', json=payload)
+    assert response.status_code == 200
+    admin_id = response.json()['id']
+    admin = test_db.get(Customer, admin_id)
+    admin.role = 'admin'
+    test_db.commit()
+    test_db.refresh(admin)
+          
+    response = client.post(url='/auth/token', data={
+            'username': 'test_email@email.com',
+            'password': 'test_password'
+            
+        })
+        
+    assert response.status_code == 200
+    token = response.json()['access_token']
+    assert token is not None
+    headers = {'Authorization': f'Bearer {token}'}
+    response = client.put('/order/update/', json={
+        'order_id': order_id,
+        'item_id': item.id,
+        'new_quantity': 1
+        },
+        headers=headers
+    )
+    assert response.status_code == 200
+    
+def test_delete_item_not_owner_403(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
+    
+    item = Item(
+        name='Iphone 17 PRO',
+        description='Iphone 17 PRO',
+        price=100,
+        quantity=10,
+        category='Cell phones'
+    )
+    test_db.add(item)
+    test_db.commit()
+    test_db.refresh(item)
+    
+    response = client.post('/order/add/', json={
+                'order_data': {
+                    'customer_id': customer_id,
+                    'status': 'pending'
+                },
+                'items_data': [{
+                    'item_id': item.id,
+                    'quantity': 3
+                }]
+        }, 
+        headers=headers
+    )
+    assert response.status_code == 201    
+    order_id = response.json()['id']
+    stmnt = select(Item).where(Item.id == item.id)
+    new_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
+    assert new_quantity == 7
+    
+    payload = {
+            'email': 'test_email@email.com',
+            'password': 'test_password',
+            'name': 'test_name'
+        }
+    response = client.post(url='/customer/register/', json=payload)
+    assert response.status_code == 200
+          
+    response = client.post(url='/auth/token', data={
+            'username': 'test_email@email.com',
+            'password': 'test_password'
+            
+        })
+        
+    assert response.status_code == 200
+    token = response.json()['access_token']
+    assert token is not None
+    headers = {'Authorization': f'Bearer {token}'}
+    response = client.request('DELETE', url='/order/deleteitem/', json={
+        'order_id': order_id,
+        'item_id': item.id
+        },
+        headers=headers
+    )
+    assert response.status_code == 403
+    assert response.json()['error']['message'] == 'Пользователь может удалять строки только в своих заказах. Администратор может удалять в любых.'
+    order = test_db.get(Order, order_id)
+    assert item.id in [o.item_id for o in order.items]
+    item = test_db.get(Item, item.id)
+    assert item.quantity == 7
+    
+def test_delete_item_not_owner_admin_200(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
+    
+    item = Item(
+        name='Iphone 17 PRO',
+        description='Iphone 17 PRO',
+        price=100,
+        quantity=10,
+        category='Cell phones'
+    )
+    test_db.add(item)
+    test_db.commit()
+    test_db.refresh(item)
+    
+    response = client.post('/order/add/', json={
+                'order_data': {
+                    'customer_id': customer_id,
+                    'status': 'pending'
+                },
+                'items_data': [{
+                    'item_id': item.id,
+                    'quantity': 3
+                }]
+        }, 
+        headers=headers
+    )
+    assert response.status_code == 201    
+    order_id = response.json()['id']
+    stmnt = select(Item).where(Item.id == item.id)
+    new_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
+    assert new_quantity == 7
+    
+    payload = {
+            'email': 'test_email@email.com',
+            'password': 'test_password',
+            'name': 'test_name'
+        }
+    response = client.post(url='/customer/register/', json=payload)
+    assert response.status_code == 200
+    admin_id = response.json()['id']
+    admin = test_db.get(Customer, admin_id)
+    admin.role = 'admin'
+    test_db.commit()
+    test_db.refresh(admin)
+          
+    response = client.post(url='/auth/token', data={
+            'username': 'test_email@email.com',
+            'password': 'test_password'
+            
+        })
+        
+    assert response.status_code == 200
+    token = response.json()['access_token']
+    assert token is not None
+    headers = {'Authorization': f'Bearer {token}'}
+    response = client.request('DELETE', url='/order/deleteitem/', json={
+        'order_id': order_id,
+        'item_id': item.id
+        },
+        headers=headers
+    )
+    assert response.status_code == 200
     
     
+def test_add_item_not_owner_403(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
+    
+    item = Item(
+        name='Iphone 17 PRO',
+        description='Iphone 17 PRO',
+        price=100,
+        quantity=10,
+        category='Cell phones'
+    )
+    test_db.add(item)
+    test_db.commit()
+    test_db.refresh(item)
+    
+    response = client.post('/order/add/', json={
+                'order_data': {
+                    'customer_id': customer_id,
+                    'status': 'pending'
+                },
+                'items_data': [{
+                    'item_id': item.id,
+                    'quantity': 3
+                }]
+        }, 
+        headers=headers
+    )
+    assert response.status_code == 201    
+    order_id = response.json()['id']
+    stmnt = select(Item).where(Item.id == item.id)
+    new_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
+    assert new_quantity == 7
+    
+    payload = {
+            'email': 'test_email@email.com',
+            'password': 'test_password',
+            'name': 'test_name'
+        }
+    response = client.post(url='/customer/register/', json=payload)
+    assert response.status_code == 200
+          
+    response = client.post(url='/auth/token', data={
+            'username': 'test_email@email.com',
+            'password': 'test_password'
+            
+        })
+        
+    assert response.status_code == 200
+    token = response.json()['access_token']
+    assert token is not None
+    headers = {'Authorization': f'Bearer {token}'}
+    response = client.post('/order/additem/', json={
+        'order_id': order_id,
+        'item_id': item.id,
+        'quantity': 2
+        },
+        headers=headers
+    )
+    assert response.status_code == 403
+    assert response.json()['error']['message'] == 'Пользователь может добавлять строки только в своих заказах. Администратор может добавлять в любых.'
+    order = test_db.get(Order, order_id)
+    assert item.id in [o.item_id for o in order.items]
+    item = test_db.get(Item, item.id)
+    assert item.quantity == 7
+    
+def test_add_item_not_owner_admin_200(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
+    
+    seed_item = Item(
+        name='Seed Item',
+        description='Seed Item',
+        price=1,
+        quantity=1,
+        category='Cell phones'
+    )
+    test_db.add(seed_item)
+    test_db.commit()
+    test_db.refresh(seed_item)
+
+    item = Item(
+        name='Iphone 17 PRO',
+        description='Iphone 17 PRO',
+        price=100,
+        quantity=10,
+        category='Cell phones'
+    )
+    test_db.add(item)
+    test_db.commit()
+    test_db.refresh(item)
+    
+    payload = {
+            'email': 'test_email@email.com',
+            'password': 'test_password',
+            'name': 'test_name'
+        }
+    response = client.post(url='/customer/register/', json=payload)
+    assert response.status_code == 200
+    admin_id = response.json()['id']
+    admin = test_db.get(Customer, admin_id)
+    admin.role = 'admin'
+    test_db.commit()
+    test_db.refresh(admin)
+          
+    response = client.post(url='/auth/token', data={
+            'username': 'test_email@email.com',
+            'password': 'test_password'
+            
+        })
+        
+    assert response.status_code == 200
+    token = response.json()['access_token']
+    assert token is not None
+    headers = {'Authorization': f'Bearer {token}'}
+    
+    response = client.post('/order/add/', json={
+            'order_data': {
+                'customer_id': customer_id,
+                'status': 'pending'
+            },
+            'items_data': [{
+                'item_id': seed_item.id,
+                'quantity': 1
+            }]
+        },
+        headers=headers
+    )
+    assert response.status_code == 201    
+    order_id = response.json()['id']
+    
+    response = client.post('/order/additem/', json={
+        'order_id': order_id,
+        'item_id': item.id,
+        'quantity': 2
+        },
+        headers=headers
+    )
+    
+    assert response.status_code == 200
+    stmnt = select(OrderItem).where(OrderItem.order_id == order_id, OrderItem.item_id == item.id)
+    result = test_db.execute(stmnt).scalar_one_or_none()
+    assert result is not None
+    assert result.quantity == 2
+    stmnt = select(Item).where(Item.id == item.id)
+    item_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
+    assert item_quantity == 8
 
     
     
