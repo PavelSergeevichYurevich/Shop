@@ -182,6 +182,53 @@ def test_update_order_item_quantity_decrease_200(client, test_db, auth_user):
     stmnt = select(OrderItem).where(OrderItem.order_id == order_id, OrderItem.item_id == item.id)
     new_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
     assert new_quantity == 1
+
+def test_update_order_item_quantity_increase_200(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD,
+        name=NAME
+    )
+    item = Item(
+        name='Iphone 17 PRO',
+        description='Iphone 17 PRO',
+        price=100,
+        quantity=10,
+        category='Cell phones'
+    )
+    test_db.add(item)
+    test_db.commit()
+    test_db.refresh(item)
+
+    response = client.post('/order/add/', json={
+            'order_data': {
+                'customer_id': customer_id,
+                'status': 'pending'
+            },
+            'items_data': [{
+                    'item_id': item.id,
+                    'quantity': 3
+            }]
+        },
+        headers=headers
+    )
+    assert response.status_code == 201
+    order_id = response.json()['id']
+
+    response = client.put('/order/update/', json={
+        'order_id': order_id,
+        'item_id': item.id,
+        'new_quantity': 4
+        },
+        headers=headers
+    )
+    assert response.status_code == 200
+    stmnt = select(Item).where(Item.id == item.id)
+    new_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
+    assert new_quantity == 6
+    stmnt = select(OrderItem).where(OrderItem.order_id == order_id, OrderItem.item_id == item.id)
+    order_item_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
+    assert order_item_quantity == 4
     
 def test_update_order_item_400_not_enough_items(client, test_db, auth_user):
     customer_id, headers = auth_user(
@@ -556,13 +603,68 @@ def test_add_item_quantity_not_enough_400(client, test_db, auth_user):
     )
     
     assert response.status_code == 400
-    assert response.json()['error']['message'] == 'Товар недоступен или недостаточно на складе'
+    assert response.json()['error']['message'] == 'Недостаточно на складе'
     stmnt = select(Item).where(Item.id == item.id)
     item_quantity = test_db.execute(stmnt).scalar_one_or_none().quantity
     assert item_quantity == 10
     stmnt = select(OrderItem).where(OrderItem.order_id == order_id, OrderItem.item_id == item.id)
     result = test_db.execute(stmnt).scalar_one_or_none()
     assert result is None
+    
+def test_add_item_not_exists_400(client, test_db, auth_user):
+    customer_id, headers = auth_user(
+        email=EMAIL,
+        password=PASSWORD, 
+        name=NAME
+    )
+    
+    seed_item = Item(
+        name='Seed Item',
+        description='Seed Item',
+        price=1,
+        quantity=1,
+        category='Cell phones'
+    )
+    test_db.add(seed_item)
+    test_db.commit()
+    test_db.refresh(seed_item)
+
+    item = Item(
+        name='Iphone 17 PRO',
+        description='Iphone 17 PRO',
+        price=100,
+        quantity=10,
+        category='Cell phones'
+    )
+    test_db.add(item)
+    test_db.commit()
+    test_db.refresh(item)
+    
+    response = client.post('/order/add/', json={
+            'order_data': {
+                'customer_id': customer_id,
+                'status': 'pending'
+            },
+            'items_data': [{
+                'item_id': seed_item.id,
+                'quantity': 1
+            }]
+        }, 
+        headers=headers
+    )
+    assert response.status_code == 201    
+    order_id = response.json()['id']
+    
+    response = client.post('/order/additem/', json={
+        'order_id': order_id,
+        'item_id': 99999,
+        'quantity': 12
+        },
+        headers=headers
+    )
+    
+    assert response.status_code == 400
+    assert response.json()['error']['message'] == 'Товар недоступен'
     
 def test_show_orders_with_no_orders_200(client, test_db, auth_user):
     customer_id, headers = auth_user(

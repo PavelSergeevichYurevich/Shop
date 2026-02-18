@@ -1,6 +1,6 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update
 from sqlalchemy.orm import Session
 from app.dependencies.dependency import get_db
 from app.models.models import Customer, Order, OrderItem, Item
@@ -55,15 +55,26 @@ def add_order(order_data: OrderCreateSchema,
             if not db_item:
                 raise HTTPException(status_code=404, detail=f"Товар {item_info.item_id} не найден")
             
-            if db_item.quantity < item_info.quantity:
+            stmt = (
+            update(Item)
+            .where(
+                Item.id == item_info.item_id,
+                Item.quantity >= item_info.quantity
+            )
+            .values(quantity=Item.quantity - item_info.quantity)
+            .returning(Item.id)
+            )
+
+            result = db.execute(stmt)
+            updated_row = result.scalar_one_or_none()
+
+            if updated_row is None:
+                db.rollback()
                 raise HTTPException(
                     status_code=400, 
                     detail=f"Недостаточно товара {db_item.name} на складе. В наличии: {db_item.quantity}"
                 )
 
-            # 3. Списываем остаток (Бизнес-логика)
-            db_item.quantity -= item_info.quantity
-            
             # 4. Создаем строку заказа с фиксацией цены
             new_order_item = OrderItem(
                 order_id=new_order.id,
@@ -136,14 +147,30 @@ def update_order_item(updating_item: UpdatingItemSchema,
     diff = updating_item.new_quantity - order_item.quantity
 
     # 4. Проверяем склад, если количество увеличивается
-    if diff > 0 and item.quantity < diff:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Недостаточно товара на складе. Можно добавить еще: {item.quantity}"
+    if diff > 0:
+        stmt = (
+        update(Item)
+        .where(
+            Item.id == updating_item.item_id,
+            Item.quantity >= diff
+        )
+        .values(quantity=Item.quantity - diff)
+        .returning(Item.id)
         )
 
+        result = db.execute(stmt)
+        updated_row = result.scalar_one_or_none()
+
+        if updated_row is None:
+            db.rollback()
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Недостаточно товара на складе. Можно добавить еще: {item.quantity}"
+            )
+    else:
+        item.quantity -= diff
+
     # 5. Обновляем склад и строку заказа
-    item.quantity -= diff # Если diff отрицательный, минус на минус даст плюс (возврат)
     order_item.quantity = updating_item.new_quantity
 
     db.commit()
@@ -187,9 +214,25 @@ def add_item_to_order(adding_item: AddingItemSchema,
         raise HTTPException(status_code=403, detail="Пользователь может добавлять строки только в своих заказах. Администратор может добавлять в любых.")
     # 1. Проверяем товар и наличие
     db_item = db.get(Item, adding_item.item_id)
-    if not db_item or db_item.quantity < adding_item.quantity:
-        raise HTTPException(status_code=400, detail="Товар недоступен или недостаточно на складе")
-    db_item.quantity -= adding_item.quantity
+    if not db_item:
+        raise HTTPException(status_code=400, detail="Товар недоступен")
+    
+    stmt = (
+        update(Item)
+        .where(
+            Item.id == adding_item.item_id,
+            Item.quantity >= adding_item.quantity
+        )
+        .values(quantity=Item.quantity - adding_item.quantity)
+        .returning(Item.id)
+        )
+
+    result = db.execute(stmt)
+    updated_row = result.scalar_one_or_none()
+
+    if updated_row is None:
+        db.rollback()
+        raise HTTPException(status_code=400, detail='Недостаточно на складе')
     
     new_order_item = OrderItem(
         order_id = adding_item.order_id,
